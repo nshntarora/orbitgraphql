@@ -1,0 +1,5 @@
+__debug*
+.DS_Store
+*.log
+.vscode
+*.log.json
