@@ -3,3 +3,4 @@ __debug*
 *.log
 .vscode
 *.log.json
+*.cache.json
