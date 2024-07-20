@@ -2,6 +2,8 @@ package cache
 
 import (
 	"context"
+	"encoding/json"
+	"reflect"
 
 	"github.com/go-redis/redis/v8"
 )
@@ -34,15 +36,40 @@ func NewRedisCache() *RedisCache {
 }
 
 func (c *RedisCache) Set(key string, value interface{}) error {
-	c.cache.Set(ctx, key, value, 0)
+	valueType := reflect.TypeOf(value)
+	switch valueType.Kind() {
+	case reflect.Map:
+		br, _ := json.Marshal(value)
+		c.cache.Set(ctx, key, string(br), 0)
+		c.cache.Set(ctx, key+"_type", "reflect.Map", 0)
+	case reflect.Slice:
+		br, _ := json.Marshal(value)
+		c.cache.Set(ctx, key, string(br), 0)
+		c.cache.Set(ctx, key+"_type", "reflect.Slice", 0)
+	default:
+		c.cache.Set(ctx, key, value, 0)
+	}
 	return nil
 }
 
 func (c *RedisCache) Get(key string) (interface{}, error) {
+	typeValue, _ := c.cache.Get(ctx, key+"_type").Result()
 	val, err := c.cache.Get(ctx, key).Result()
 	if err != nil {
 		return nil, err
 	}
+
+	switch typeValue {
+	case "reflect.Map":
+		var m map[string]interface{}
+		json.Unmarshal([]byte(val), &m)
+		return m, nil
+	case "reflect.Slice":
+		var s []interface{}
+		json.Unmarshal([]byte(val), &s)
+		return s, nil
+	}
+
 	return val, nil
 }
 

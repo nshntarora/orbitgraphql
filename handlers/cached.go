@@ -10,15 +10,17 @@ import (
 	"graphql_cache/utils/ast_utils"
 	"graphql_cache/utils/test_endpoints"
 	"strings"
+	"time"
 
 	"github.com/vektah/gqlparser/ast"
 )
 
-var cacheStore = cache.NewInMemoryCache()
-var recordCacheStore = cache.NewInMemoryCache()
-var queryCacheStore = cache.NewInMemoryCache()
+var cacheStore = cache.NewRedisCache()
+var recordCacheStore = cache.NewRedisCache()
+var queryCacheStore = cache.NewRedisCache()
 
 func ProxyToCachedAPI() []byte {
+	start := time.Now()
 	copiedRequestBody := test_endpoints.REQUEST_BODY
 	// Parse the query
 
@@ -29,10 +31,13 @@ func ProxyToCachedAPI() []byte {
 		return nil
 	}
 
+	fmt.Println("time taken to generate AST ", time.Since(start))
+
 	cachedResponse, err := ParseASTBuildResponse(astQuery, copiedRequestBody)
 	if err == nil && cachedResponse != nil {
 		fmt.Println("serving response from cache...")
 		br, _ := json.Marshal(cachedResponse)
+		fmt.Println("time taken to serve response from cache ", time.Since(start))
 		return RemoveTypenameFromResponse(br)
 	}
 
@@ -41,6 +46,8 @@ func ProxyToCachedAPI() []byte {
 		fmt.Println("Error transforming body:", err)
 		return nil
 	}
+
+	fmt.Println("time taken to transform body ", time.Since(start))
 
 	copiedRequestBody["query"] = transformedBody
 
@@ -51,11 +58,15 @@ func ProxyToCachedAPI() []byte {
 		fmt.Println("Error unmarshalling response:", err)
 	}
 
+	fmt.Println("time taken to get response from API ", time.Since(start))
+
 	astWithTypes, err := ast_utils.GetASTFromQuery(transformedBody)
 	if err != nil {
 		fmt.Println("Error parsing query:", err)
 		return nil
 	}
+
+	fmt.Println("time taken to generate AST with types ", time.Since(start))
 
 	reqVariables := copiedRequestBody["variables"]
 	variables := make(map[string]interface{})
@@ -73,12 +84,16 @@ func ProxyToCachedAPI() []byte {
 		}
 	}
 
+	fmt.Println("time taken to build response key ", time.Since(start))
+
 	// go through the response. Every object that has a __typename field, and an id field cache it in the format of typename:id
 	// for example, if the response has an object with __typename: "Organisation" and id: "1234", cache it as Organisation:1234
 	// if the object has a nested object with __typename: "User" and id: "5678", cache
 	// it as User:5678
 
 	CacheResponse("data", responseMap, nil)
+
+	fmt.Println("time taken to cache response ", time.Since(start))
 
 	cacheStore.Debug("cacheStore")
 	recordCacheStore.Debug("recordCacheStore")
@@ -93,6 +108,7 @@ func ProxyToCachedAPI() []byte {
 	// queryCacheState, _ := queryCacheStore.JSON()
 	// fmt.Println(string(queryCacheState))
 
+	fmt.Println("time taken to finish completely ", time.Since(start))
 	return RemoveTypenameFromResponse(response)
 }
 
@@ -230,48 +246,49 @@ func TraverseResponseFromKey(response interface{}) (interface{}, error) {
 			}
 			return TraverseResponseFromKey(response)
 		}
-	}
-	responseMap := response.(map[string]interface{})
-	for key, value := range responseMap {
-		if val, ok := value.(string); ok { // handle other data types, arrays and objects
-			if strings.HasPrefix(val, "gql:") {
-				nestedResponse, err := TraverseResponseFromKey(val)
-				if err != nil {
-					fmt.Println("Error traversing nested response from key:", val, " ", err)
-					return nil, err
+	} else if responseMap, ok := response.(map[string]interface{}); ok {
+		for key, value := range responseMap {
+			if val, ok := value.(string); ok { // handle other data types, arrays and objects
+				if strings.HasPrefix(val, "gql:") {
+					nestedResponse, err := TraverseResponseFromKey(val)
+					if err != nil {
+						fmt.Println("Error traversing nested response from key:", val, " ", err)
+						return nil, err
+					}
+					responseMap[key] = nestedResponse
 				}
-				responseMap[key] = nestedResponse
-			}
-		} else if val, ok := value.(map[string]interface{}); ok {
-			for k, v := range val {
-				if v, ok := v.(string); ok {
-					if strings.HasPrefix(v, "gql:") {
-						nestedResponse, err := TraverseResponseFromKey(v)
-						if err != nil {
-							fmt.Println("Error traversing nested response from key:", v, " ", err)
-							return nil, err
+			} else if val, ok := value.(map[string]interface{}); ok {
+				for k, v := range val {
+					if v, ok := v.(string); ok {
+						if strings.HasPrefix(v, "gql:") {
+							nestedResponse, err := TraverseResponseFromKey(v)
+							if err != nil {
+								fmt.Println("Error traversing nested response from key:", v, " ", err)
+								return nil, err
+							}
+							val[k] = nestedResponse
 						}
-						val[k] = nestedResponse
 					}
 				}
-			}
-		} else if val, ok := value.([]interface{}); ok {
-			for i, v := range val {
-				if v, ok := v.(string); ok {
-					if strings.HasPrefix(v, "gql:") {
-						nestedResponse, err := TraverseResponseFromKey(v)
-						if err != nil {
-							fmt.Println("Error traversing nested response from key:", v, " ", err)
-							return nil, err
+			} else if val, ok := value.([]interface{}); ok {
+				for i, v := range val {
+					if v, ok := v.(string); ok {
+						if strings.HasPrefix(v, "gql:") {
+							nestedResponse, err := TraverseResponseFromKey(v)
+							if err != nil {
+								fmt.Println("Error traversing nested response from key:", v, " ", err)
+								return nil, err
+							}
+							val[i] = nestedResponse
 						}
-						val[i] = nestedResponse
 					}
 				}
 			}
 		}
+		return responseMap, nil
 	}
 
-	return responseMap, nil
+	return nil, nil
 }
 
 func CacheObject(field string, object map[string]interface{}, parent map[string]interface{}) string {
