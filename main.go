@@ -5,6 +5,7 @@ import (
 	"graphql_cache/handlers"
 	"graphql_cache/utils/benchmark_utils"
 	"graphql_cache/utils/file_utils"
+	"graphql_cache/utils/test_endpoints"
 	"reflect"
 	"time"
 )
@@ -12,6 +13,9 @@ import (
 const NUMBER_OF_REQUESTS = 3
 
 func main() {
+
+	test_endpoints.RunTodosAPIRequests()
+
 	// call ProxyToCachedAPI three times and log the average time taken to get the result from the function
 	// then call the ProxyToAPI three times and log the average time taken to get the result from the function
 	// also compare the response bodies for both function calls, and log an error is responses are not the same

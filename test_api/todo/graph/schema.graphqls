@@ -1,0 +1,44 @@
+type Todo {
+  id: ID!
+  text: String!
+  done: Boolean!
+  userId: String!
+  user: User!
+  createdAt: String!
+  updatedAt: String!
+}
+
+type User {
+  id: ID!
+  name: String!
+  email: String!
+  username: String!
+  todos: [Todo!]!
+  createdAt: String!
+  updatedAt: String!
+}
+
+type Query {
+  allTodos: [Todo!]!
+  todos(query: String, page: Int, perPage: Int): [Todo!]!
+  users(query: String, page: Int, perPage: Int): [User!]!
+  user(id: String!): User!
+  todo(id: String!): Todo!
+}
+
+input NewTodoParams {
+  text: String!
+  userId: String!
+}
+
+type Mutation {
+  createTodo(params: NewTodoParams!): Todo!
+  updateTodo(id: String!, text: String!): Todo!
+  markAsDone(id: String!): Todo!
+  markAsUndone(id: String!): Todo!
+  deleteTodo(id: String!): Todo!
+  createUser(name: String!, email: String!, username: String!): User!
+  deleteUser(id: String!): User!
+  updateUser(id: String!, name: String, email: String, username: String): User!
+  deleteEverything: Boolean!
+}
