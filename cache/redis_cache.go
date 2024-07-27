@@ -24,7 +24,7 @@ type RedisCache struct {
 // 	})
 // }
 
-func NewRedisCache() *RedisCache {
+func NewRedisCache() Cache {
 	c := redis.NewClient(&redis.Options{
 		Addr:     "localhost:6379",
 		Password: "", // no password set

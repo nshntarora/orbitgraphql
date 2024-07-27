@@ -181,7 +181,7 @@ func (c *GraphQLClient) PaginateUsers() ([]db.User, time.Duration, error) {
 	variables := map[string]interface{}{
 		"query":   "",
 		"page":    1,
-		"perPage": 5,
+		"perPage": 100,
 	}
 
 	data, time, err := c.MakeRequest(query, variables)
@@ -215,7 +215,7 @@ func (c *GraphQLClient) PaginateTodos() ([]db.Todo, time.Duration, error) {
 	variables := map[string]interface{}{
 		"query":   "",
 		"page":    1,
-		"perPage": 5,
+		"perPage": 100,
 	}
 
 	data, time, err := c.MakeRequest(query, variables)

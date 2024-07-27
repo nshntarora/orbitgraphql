@@ -7,4 +7,5 @@ type Cache interface {
 	Exists(key string) (bool, error)
 	Map() (map[string]interface{}, error)
 	JSON() ([]byte, error)
+	Debug(identifier string) error
 }
