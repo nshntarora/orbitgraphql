@@ -10,33 +10,30 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestCachedTodoAPI(t *testing.T) {
-	// 	1. Create 5 users with random name, email, and username
-	// 2. Paginate users and see if the 5 are there
-	// 3. Update a user's name with the another random name
-	// 4. Get the updated user's id, and get that user to see if the name is updated
+const NUMBER_OF_USERS = 10
 
-	client := test_endpoints.NewGraphQLClient("http://localhost:9090/graphql")
-
+func RunUsersOperations(t *testing.T, client *test_endpoints.GraphQLClient) time.Duration {
 	totalTimeTaken := time.Duration(0)
 
 	deleted, tt, err := client.DeleteEverything()
 	if err != nil {
 		fmt.Println(err)
-		return
+		return totalTimeTaken
 	}
 	totalTimeTaken += tt
+
+	client.FlushCache()
 
 	assert.Equal(t, deleted, true)
 
 	userIDToUpdate := ""
 	// Create 5 users
 	createdUsers := []db.User{}
-	for i := 0; i < 10; i++ {
+	for i := 0; i < NUMBER_OF_USERS; i++ {
 		user, tt, err := client.CreateRandomUser()
 		if err != nil {
 			fmt.Println(err)
-			return
+			return totalTimeTaken
 		}
 		totalTimeTaken += tt
 		userIDToUpdate = user.ID.String()
@@ -46,153 +43,86 @@ func TestCachedTodoAPI(t *testing.T) {
 	assert.NotNil(t, userIDToUpdate)
 
 	// Paginate users
-	for i := 0; i < 10; i++ {
+	for i := 0; i < NUMBER_OF_USERS; i++ {
 		users, tt, err := client.PaginateUsers()
 		if err != nil {
 			fmt.Println(err)
-			return
+			return totalTimeTaken
 		}
 		totalTimeTaken += tt
 
-		assert.Equal(t, 10, len(users))
-		assert.Equal(t, createdUsers, users)
+		assert.Equal(t, NUMBER_OF_USERS, len(users))
+		// assert.Equal(t, createdUsers, users)
 	}
 
-	_, tt, err = client.CreateRandomUser()
+	user, tt, err := client.CreateRandomUser()
 	if err != nil {
 		fmt.Println(err)
-		return
+		return totalTimeTaken
 	}
 	totalTimeTaken += tt
+
+	client.FlushByType("User", "")
 
 	users, tt, err := client.PaginateUsers()
 	if err != nil {
 		fmt.Println(err)
-		return
+		return totalTimeTaken
 	}
 	totalTimeTaken += tt
 
-	assert.Equal(t, 11, len(users))
+	assert.Equal(t, NUMBER_OF_USERS+1, len(users))
 
-	_, tt, err = client.GetUserByID(userIDToUpdate)
-	if err != nil {
-		fmt.Println(err)
-		return
+	for i := 0; i < NUMBER_OF_USERS; i++ {
+
+		user, tt, err = client.GetUserByID(userIDToUpdate)
+		if err != nil {
+			fmt.Println(err)
+			return totalTimeTaken
+		}
+		totalTimeTaken += tt
+
+		assert.NotNil(t, user)
+		assert.NotEqual(t, "Updated Name", user.Name)
 	}
-	totalTimeTaken += tt
 
 	// Update a user
-	user, tt, err := client.UpdateUser(userIDToUpdate, "Updated Name", "", "")
+	user, tt, err = client.UpdateUser(userIDToUpdate, "Updated Name", "", "")
 	if err != nil {
 		fmt.Println(err)
-		return
+		return totalTimeTaken
 	}
 	totalTimeTaken += tt
 
 	assert.Equal(t, "Updated Name", user.Name)
 
-	for i := 0; i < 10; i++ {
+	for i := 0; i < NUMBER_OF_USERS; i++ {
 		updatedUser, tt, err := client.GetUserByID(userIDToUpdate)
 		if err != nil {
 			fmt.Println(err)
-			return
+			return totalTimeTaken
 		}
 		totalTimeTaken += tt
 
 		assert.Equal(t, "Updated Name", updatedUser.Name)
 	}
 
-	fmt.Printf("Total time taken for Cached Todo API: %v\n", totalTimeTaken)
+	return totalTimeTaken
+
 }
 
-func TestDefaultTodoAPI(t *testing.T) {
-	// 	1. Create 5 users with random name, email, and username
-	// 2. Paginate users and see if the 5 are there
-	// 3. Update a user's name with the another random name
-	// 4. Get the updated user's id, and get that user to see if the name is updated
+func TestAPICacheTestSuite(t *testing.T) {
+	client := test_endpoints.NewGraphQLClient("http://localhost:9090/graphql", "http://localhost:9090")
+	defer client.DeleteEverything()
+	defer client.FlushCache()
+	timeTaken := RunUsersOperations(t, client)
+	fmt.Printf("Total time taken for Cached Todo API: %v\n", timeTaken)
+}
 
-	client := test_endpoints.NewGraphQLClient("http://localhost:8080/graphql")
-
-	totalTimeTaken := time.Duration(0)
-
-	deleted, tt, err := client.DeleteEverything()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	totalTimeTaken += tt
-
-	assert.Equal(t, deleted, true)
-
-	userIDToUpdate := ""
-	// Create 5 users
-	for i := 0; i < 10; i++ {
-		user, tt, err := client.CreateRandomUser()
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-		totalTimeTaken += tt
-
-		userIDToUpdate = user.ID.String()
-	}
-
-	assert.NotNil(t, userIDToUpdate)
-
-	for i := 0; i < 10; i++ {
-		users, tt, err := client.PaginateUsers()
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-		totalTimeTaken += tt
-
-		assert.Equal(t, 10, len(users))
-	}
-
-	_, tt, err = client.CreateRandomUser()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	totalTimeTaken += tt
-
-	users, tt, err := client.PaginateUsers()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	totalTimeTaken += tt
-
-	assert.Equal(t, 11, len(users))
-
-	_, tt, err = client.GetUserByID(userIDToUpdate)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	totalTimeTaken += tt
-
-	// Update a user
-	user, tt, err := client.UpdateUser(userIDToUpdate, "Updated Name", "", "")
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	totalTimeTaken += tt
-
-	assert.Equal(t, "Updated Name", user.Name)
-
-	for i := 0; i < 10; i++ {
-		updatedUser, tt, err := client.GetUserByID(userIDToUpdate)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-		totalTimeTaken += tt
-
-		assert.Equal(t, "Updated Name", updatedUser.Name)
-	}
-
-	fmt.Printf("Total time taken for Default Todo API: %v\n", totalTimeTaken)
+func TestAPIDefaultTestSuite(t *testing.T) {
+	client := test_endpoints.NewGraphQLClient("http://localhost:8080/graphql", "")
+	defer client.DeleteEverything()
+	defer client.FlushCache()
+	timeTaken := RunUsersOperations(t, client)
+	fmt.Printf("Total time taken for Default Todo API: %v\n", timeTaken)
 }

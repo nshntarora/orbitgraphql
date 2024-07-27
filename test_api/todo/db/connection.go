@@ -42,10 +42,9 @@ func (d Connection) GetAllUsers(users *[]User) error {
 	return d.DB.Find(users).Error
 }
 
-func (d Connection) GetUserByID(id string) (User, error) {
-	var todo User
-	err := d.DB.Where("id=?", id).Find(&todo)
-	return todo, err.Error
+func (d Connection) GetUserByID(id string, user *User) error {
+	err := d.DB.Where("id=?", id).Find(user)
+	return err.Error
 }
 
 func (d Connection) CreateUser(user *User) error {
@@ -148,10 +147,9 @@ func (d Connection) UpdateTodoAsIncomplete(id string) error {
 	return d.DB.Save(&todo).Error
 }
 
-func (d Connection) GetTodoByID(id string) (Todo, error) {
-	var todo Todo
-	err := d.DB.Where("id=?", id).First(&todo)
-	return todo, err.Error
+func (d Connection) GetTodoByID(id string, todo *Todo) error {
+	err := d.DB.Where("id=?", id).First(todo)
+	return err.Error
 }
 
 func (d Connection) DeleteTodo(id string) error {

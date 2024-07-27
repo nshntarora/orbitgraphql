@@ -33,8 +33,9 @@ func (r *mutationResolver) UpdateTodo(ctx context.Context, id string, text strin
 		return nil, err
 	}
 
-	todo, err := r.DB.GetTodoByID(id)
-	if err != nil {
+	todo := db.Todo{}
+	err = r.DB.GetTodoByID(id, &todo)
+	if err != nil || todo.ID == uuid.Nil {
 		return nil, err
 	}
 
@@ -44,8 +45,9 @@ func (r *mutationResolver) UpdateTodo(ctx context.Context, id string, text strin
 // MarkAsDone is the resolver for the markAsDone field.
 func (r *mutationResolver) MarkAsDone(ctx context.Context, id string) (*db.Todo, error) {
 	r.DB.UpdateTodoAsDone(id)
-	todo, err := r.DB.GetTodoByID(id)
-	if err != nil {
+	todo := db.Todo{}
+	err := r.DB.GetTodoByID(id, &todo)
+	if err != nil || todo.ID == uuid.Nil {
 		return nil, err
 	}
 	return &todo, nil
@@ -54,8 +56,9 @@ func (r *mutationResolver) MarkAsDone(ctx context.Context, id string) (*db.Todo,
 // MarkAsUndone is the resolver for the markAsUndone field.
 func (r *mutationResolver) MarkAsUndone(ctx context.Context, id string) (*db.Todo, error) {
 	r.DB.UpdateTodoAsDone(id)
-	todo, err := r.DB.GetTodoByID(id)
-	if err != nil {
+	todo := db.Todo{}
+	err := r.DB.GetTodoByID(id, &todo)
+	if err != nil || todo.ID == uuid.Nil {
 		return nil, err
 	}
 	return &todo, nil
@@ -63,8 +66,9 @@ func (r *mutationResolver) MarkAsUndone(ctx context.Context, id string) (*db.Tod
 
 // DeleteTodo is the resolver for the deleteTodo field.
 func (r *mutationResolver) DeleteTodo(ctx context.Context, id string) (*db.Todo, error) {
-	todo, err := r.DB.GetTodoByID(id)
-	if err != nil {
+	todo := db.Todo{}
+	err := r.DB.GetTodoByID(id, &todo)
+	if err != nil || todo.ID == uuid.Nil {
 		return nil, err
 	}
 
@@ -89,8 +93,9 @@ func (r *mutationResolver) CreateUser(ctx context.Context, name string, email st
 
 // DeleteUser is the resolver for the deleteUser field.
 func (r *mutationResolver) DeleteUser(ctx context.Context, id string) (*db.User, error) {
-	user, err := r.DB.GetUserByID(id)
-	if err != nil {
+	user := db.User{}
+	err := r.DB.GetUserByID(id, &user)
+	if err != nil || user.ID == uuid.Nil {
 		return nil, err
 	}
 
@@ -106,8 +111,9 @@ func (r *mutationResolver) UpdateUser(ctx context.Context, id string, name *stri
 		return nil, err
 	}
 
-	user, err := r.DB.GetUserByID(id)
-	if err != nil {
+	user := db.User{}
+	err = r.DB.GetUserByID(id, &user)
+	if err != nil || user.ID == uuid.Nil {
 		return nil, err
 	}
 
@@ -146,15 +152,19 @@ func (r *queryResolver) Todos(ctx context.Context, query *string, page *int, per
 func (r *queryResolver) Users(ctx context.Context, query *string, page *int, perPage *int) ([]db.User, error) {
 	var users []db.User
 
-	r.DB.PaginateUsers(&users, query, page, perPage)
+	err := r.DB.PaginateUsers(&users, query, page, perPage)
+	if err != nil {
+		return nil, err
+	}
 
 	return users, nil
 }
 
 // User is the resolver for the user field.
 func (r *queryResolver) User(ctx context.Context, id string) (*db.User, error) {
-	user, err := r.DB.GetUserByID(id)
-	if err != nil {
+	user := db.User{}
+	err := r.DB.GetUserByID(id, &user)
+	if err != nil || user.ID == uuid.Nil {
 		return nil, err
 	}
 	return &user, nil
@@ -162,8 +172,9 @@ func (r *queryResolver) User(ctx context.Context, id string) (*db.User, error) {
 
 // Todo is the resolver for the todo field.
 func (r *queryResolver) Todo(ctx context.Context, id string) (*db.Todo, error) {
-	todo, err := r.DB.GetTodoByID(id)
-	if err != nil {
+	todo := db.Todo{}
+	err := r.DB.GetTodoByID(id, &todo)
+	if err != nil || todo.ID == uuid.Nil {
 		return nil, err
 	}
 	return &todo, nil

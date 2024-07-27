@@ -22,8 +22,8 @@ type Query {
   allTodos: [Todo!]!
   todos(query: String, page: Int, perPage: Int): [Todo!]!
   users(query: String, page: Int, perPage: Int): [User!]!
-  user(id: String!): User!
-  todo(id: String!): Todo!
+  user(id: String!): User
+  todo(id: String!): Todo
 }
 
 input NewTodoParams {

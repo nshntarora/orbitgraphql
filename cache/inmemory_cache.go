@@ -49,3 +49,17 @@ func (c *InMemoryCache) Debug(identifier string) error {
 	f.Write(string(jsonContent))
 	return nil
 }
+
+func (c *InMemoryCache) Flush() error {
+	c.cache = make(map[string]interface{})
+	return nil
+}
+
+func (c *InMemoryCache) DeleteByPrefix(prefix string) error {
+	for key := range c.cache {
+		if len(key) >= len(prefix) && key[:len(prefix)] == prefix {
+			delete(c.cache, key)
+		}
+	}
+	return nil
+}

@@ -12,11 +12,12 @@ import (
 )
 
 type GraphQLClient struct {
+	baseURL    string
 	graphqlURL string
 }
 
-func NewGraphQLClient(graphqlURL string) *GraphQLClient {
-	return &GraphQLClient{graphqlURL: graphqlURL}
+func NewGraphQLClient(graphqlURL string, baseURL string) *GraphQLClient {
+	return &GraphQLClient{graphqlURL: graphqlURL, baseURL: baseURL}
 }
 
 type GraphQLRequest struct {
@@ -53,6 +54,38 @@ func (c *GraphQLClient) MakeRequest(query string, variables map[string]interface
 	}
 
 	return response.Data, time.Since(start), nil
+}
+
+func (c *GraphQLClient) FlushCache() error {
+	if c.baseURL == "" {
+		return nil
+	}
+	resp, err := http.Post(c.baseURL+"/flush", "application/json", nil)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	return nil
+}
+
+func (c *GraphQLClient) FlushByType(typeName, id string) error {
+	if c.baseURL == "" {
+		return nil
+	}
+	requestBody, err := json.Marshal(map[string]interface{}{
+		"type": typeName,
+		"id":   id,
+	})
+	if err != nil {
+		return err
+	}
+
+	resp, err := http.Post(c.baseURL+"/flushType", "application/json", bytes.NewBuffer(requestBody))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	return nil
 }
 
 func (c *GraphQLClient) CreateRandomUser() (*db.User, time.Duration, error) {
@@ -326,7 +359,7 @@ func RunTodosAPIRequests() {
 	// 3. Update a user's name with the another random name
 	// 4. Get the updated user's id, and get that user to see if the name is updated
 
-	client := NewGraphQLClient("http://localhost:8080/graphql")
+	client := NewGraphQLClient("http://localhost:8080/graphql", "")
 
 	_, _, err := client.DeleteEverything()
 	if err != nil {

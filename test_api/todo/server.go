@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"graphql_cache/test_api/todo/db"
 	"graphql_cache/test_api/todo/graph"
 	"log"
@@ -29,6 +30,9 @@ func main() {
 
 	srv.AroundOperations(func(ctx context.Context, next graphql.OperationHandler) graphql.ResponseHandler {
 		time.Sleep(100 * time.Millisecond)
+		opctx := graphql.GetOperationContext(ctx)
+		// opctx.Doc
+		fmt.Println(opctx.Doc)
 		response := next(ctx)
 		return response
 	})

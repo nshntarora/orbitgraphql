@@ -8,4 +8,6 @@ type Cache interface {
 	Map() (map[string]interface{}, error)
 	JSON() ([]byte, error)
 	Debug(identifier string) error
+	Flush() error
+	DeleteByPrefix(prefix string) error
 }

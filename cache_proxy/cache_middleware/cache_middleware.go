@@ -107,7 +107,12 @@ func CacheMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 			}
 			fmt.Println("time taken to serve response from cache ", time.Since(start))
 			graphqlresponse := graphcache.GraphQLResponse{Data: json.RawMessage(br)}
-			return c.JSON(200, graphqlresponse)
+			res, err := Cache.RemoveTypenameFromResponse(&graphqlresponse)
+			if err != nil {
+				fmt.Println("Error removing __typename:", err)
+				return nil
+			}
+			return c.JSON(200, res)
 		}
 
 		transformedBody, err := transformer.TransformBody(request.Query, astQuery)
@@ -191,10 +196,10 @@ func CacheMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 		// fmt.Println(string(queryCacheState))
 
 		fmt.Println("time taken to finish completely ", time.Since(start))
-		// newResponse := &graphcache.GraphQLResponse{}
-		// newResponse.FromBytes(resBody.Bytes())
-		// Cache.RemoveTypenameFromResponse(newResponse)
-		// c.Response().Header().Set("X-Proxy", "GraphQL Cache")
+		newResponse := &graphcache.GraphQLResponse{}
+		newResponse.FromBytes(resBody.Bytes())
+		Cache.RemoveTypenameFromResponse(newResponse)
+		c.Response().Header().Set("X-Proxy", "GraphQL Cache")
 		return nil
 	}
 }

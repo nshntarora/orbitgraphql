@@ -97,3 +97,21 @@ func (c *RedisCache) JSON() ([]byte, error) {
 func (c *RedisCache) Debug(identifier string) error {
 	return nil
 }
+
+func (c *RedisCache) Flush() error {
+	c.cache.FlushAll(ctx)
+	return nil
+}
+
+func (c *RedisCache) DeleteByPrefix(prefix string) error {
+	allKeys := c.cache.Keys(ctx, prefix+"*")
+	if allKeys == nil {
+		return nil
+	}
+
+	for _, key := range allKeys.Val() {
+		c.cache.Del(ctx, key)
+	}
+
+	return nil
+}

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"graphql_cache/cache"
 	"graphql_cache/utils"
+	"reflect"
 	"strings"
 
 	"github.com/vektah/gqlparser/ast"
@@ -178,6 +179,54 @@ func (gc *GraphCache) ParseASTBuildResponse(astQuery *ast.QueryDocument, request
 						}
 						finalResponse[key] = nestedResponse
 					}
+				}
+				if val, ok := value.(map[string]interface{}); ok {
+					for k, v := range val {
+						if v, ok := v.(string); ok {
+							if strings.HasPrefix(v, "gql:") {
+								nestedResponse, err := gc.TraverseResponseFromKey(v)
+								if err != nil {
+									fmt.Println("Error traversing nested response from key:", v, " ", err)
+									return nil, err
+								}
+								val[k] = nestedResponse
+							}
+						}
+					}
+					finalResponse[key] = val
+				}
+				if val, ok := value.([]interface{}); ok {
+					for i, v := range val {
+						if v, ok := v.(string); ok {
+							if strings.HasPrefix(v, "gql:") {
+								nestedResponse, err := gc.TraverseResponseFromKey(v)
+								if err != nil {
+									fmt.Println("Error traversing nested response from key:", v, " ", err)
+									return nil, err
+								}
+								val[i] = nestedResponse
+							}
+						}
+					}
+					finalResponse[key] = val
+
+				}
+				if val, ok := value.([]map[string]interface{}); ok {
+					for i, v := range val {
+						for k, v := range v {
+							if v, ok := v.(string); ok {
+								if strings.HasPrefix(v, "gql:") {
+									nestedResponse, err := gc.TraverseResponseFromKey(v)
+									if err != nil {
+										fmt.Println("Error traversing nested response from key:", v, " ", err)
+										return nil, err
+									}
+									val[i][k] = nestedResponse
+								}
+							}
+						}
+					}
+					finalResponse[key] = val
 				}
 			}
 			return finalResponse, nil
@@ -393,12 +442,49 @@ func (gc *GraphCache) GetResponseTypeID(selectionSet ast.SelectionSet, response 
 		// for example, Organisation:1234
 
 		selection := updatedSelectionSet[0].(*ast.Field)
-		selectionRespone, ok := response[selection.Name].(map[string]interface{})
-		if ok && selectionRespone != nil && selectionRespone["id"] != nil && selectionRespone["__typename"] != nil {
-			id := selectionRespone["id"].(string)
-			typeName := selectionRespone["__typename"].(string)
-			return map[string]interface{}{updatedSelectionSet[0].(*ast.Field).Name: "gql:" + typeName + ":" + id}
+		// fmt.Println(reflect.TypeOf(response[selection.Name]).String() == "map[string]interface{}")
+		// fmt.Println(reflect.TypeOf(response[selection.Name]).String() == "map[string]interface {}")
+		// fmt.Println(reflect.TypeOf(response[selection.Name]).Kind())
+		// fmt.Println(reflect.TypeOf(response[selection.Name]).Elem())
+		// fmt.Println(reflect.TypeOf(response[selection.Name]).String())
+
+		switch reflect.TypeOf(response[selection.Name]).Kind() {
+		case reflect.Map:
+			selectionRespone, ok := response[selection.Name].(map[string]interface{})
+			if ok && selectionRespone != nil && selectionRespone["id"] != nil && selectionRespone["__typename"] != nil {
+				id := selectionRespone["id"].(string)
+				typeName := selectionRespone["__typename"].(string)
+				return map[string]interface{}{updatedSelectionSet[0].(*ast.Field).Name: "gql:" + typeName + ":" + id}
+			}
+		case reflect.Slice:
+			selectionRespone, ok := response[selection.Name].([]interface{})
+			if ok && selectionRespone != nil {
+				responseObjects := make([]interface{}, 0)
+				for _, obj := range selectionRespone {
+					if objMap, ok := obj.(map[string]interface{}); ok {
+						if objMap["id"] != nil && objMap["__typename"] != nil {
+							id := objMap["id"].(string)
+							typeName := objMap["__typename"].(string)
+							responseObjects = append(responseObjects, "gql:"+typeName+":"+id)
+						}
+					}
+				}
+				return map[string]interface{}{updatedSelectionSet[0].(*ast.Field).Name: responseObjects}
+			}
 		}
+
+		// selectionRespone, ok := response[selection.Name].(map[string]interface{})
+		// if ok && selectionRespone != nil && selectionRespone["id"] != nil && selectionRespone["__typename"] != nil {
+		// 	id := selectionRespone["id"].(string)
+		// 	typeName := selectionRespone["__typename"].(string)
+		// 	return map[string]interface{}{updatedSelectionSet[0].(*ast.Field).Name: "gql:" + typeName + ":" + id}
+		// }
+		// selectionRespone, ok = response[selection.Name].([]interface{})
+		// if ok && selectionRespone != nil && selectionRespone["id"] != nil && selectionRespone["__typename"] != nil {
+		// 	id := selectionRespone["id"].(string)
+		// 	typeName := selectionRespone["__typename"].(string)
+		// 	return map[string]interface{}{updatedSelectionSet[0].(*ast.Field).Name: "gql:" + typeName + ":" + id}
+		// }
 	}
 	return nil
 }
@@ -523,4 +609,16 @@ func (gc *GraphCache) Debug() {
 	gc.cacheStore.Debug("cacheStore")
 	gc.recordCacheStore.Debug("recordCacheStore")
 	gc.queryCacheStore.Debug("queryCacheStore")
+}
+
+func (gc *GraphCache) Flush() {
+	gc.cacheStore.Flush()
+	gc.recordCacheStore.Flush()
+	gc.queryCacheStore.Flush()
+}
+
+func (gc *GraphCache) FlushByType(typeName string, id string) {
+	gc.cacheStore.DeleteByPrefix("gql:" + typeName + ":" + id)
+	gc.recordCacheStore.DeleteByPrefix("gql:" + typeName + ":" + id)
+	gc.queryCacheStore.DeleteByPrefix("gql:" + typeName + ":" + id)
 }
