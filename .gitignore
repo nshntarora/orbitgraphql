@@ -5,3 +5,5 @@ __debug*
 *.log.json
 *.cache.json
 *.db
+*.env
+.env
