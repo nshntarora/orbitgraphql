@@ -1,5 +1,7 @@
 package cache
 
+// Cache is an interface that defines the methods that a cache should implement
+// we can have different cache implementations like Redis, Memcached, etc.
 type Cache interface {
 	Set(key string, value interface{}) error
 	Get(key string) (interface{}, error)

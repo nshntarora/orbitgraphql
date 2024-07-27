@@ -4,57 +4,54 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"graphql_cache/graphcache"
-	"graphql_cache/transformer"
-	"graphql_cache/utils/ast_utils"
 	"io"
 	"net"
 	"net/http"
 	"time"
+
+	"log"
 
 	"github.com/labstack/echo/v4"
 )
 
 var Cache = graphcache.NewGraphCache("redis")
 
+// CacheMiddleware is a middleware that intercepts the request and response
+// and caches the response if it is a query
+// if it is a mutation, it does not cache the response, but invalidates the objects which have been mutated
 func CacheMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		start := time.Now()
 
 		requestBytes, err := io.ReadAll(c.Request().Body)
 		if err != nil {
-			fmt.Println("Error reading request body:", err)
+			log.Println("Error reading request body:", err)
 			return nil
 		}
-
-		fmt.Println("request content length ", c.Request().ContentLength)
-		fmt.Println("request body length", len(requestBytes))
 
 		var request graphcache.GraphQLRequest
 		err = json.Unmarshal(requestBytes, &request)
 		if err != nil {
-			fmt.Println("Error unmarshalling request:", err)
+			log.Println("Error unmarshalling request:", err)
 			return nil
 		}
 
-		astQuery, err := ast_utils.GetASTFromQuery(request.Query)
+		astQuery, err := graphcache.GetASTFromQuery(request.Query)
 		if err != nil {
-			fmt.Println("Error parsing query:", err)
+			log.Println("Error parsing query:", err)
 			return nil
 		}
 
 		if astQuery.Operations[0].Operation == "mutation" {
 			// if the operation is a mutation, we don't cache it
-			// c.Request().Body = io.NopCloser(bytes.NewBuffer(requestBytes))
-			// c.Request().ContentLength = -1
-			transformedBody, err := transformer.TransformBody(request.Query, astQuery)
+			transformedBody, err := graphcache.AddTypenameToQuery(request.Query)
 			if err != nil {
-				fmt.Println("Error transforming body:", err)
+				log.Println("Error transforming body:", err)
 				return nil
 			}
 
-			fmt.Println("time taken to transform body ", time.Since(start))
+			log.Println("time taken to transform body ", time.Since(start))
 
 			transformedRequest := request
 			transformedRequest.Query = transformedBody
@@ -70,58 +67,41 @@ func CacheMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 			if err != nil {
 				return err
 			}
-			fmt.Println("found a mutation, invalidating cache...")
 
 			responseMap := make(map[string]interface{})
 			err = json.Unmarshal(resBody.Bytes(), &responseMap)
 			if err != nil {
-				fmt.Println("Error unmarshalling response:", err)
+				log.Println("Error unmarshalling response:", err)
 			}
 
-			// go through the response. Every object that has a __typename field, and an id field cache it in the format of typename:id
-			// for example, if the response has an object with __typename: "Organisation" and id: "1234", cache it as Organisation:1234
-			// if the object has a nested object with __typename: "User" and id: "5678", cache
-			// it as User:5678
-
 			Cache.InvalidateCache("data", responseMap, nil)
-
-			// newResponse := &graphcache.GraphQLResponse{}
-			// newResponse.FromBytes(resBody.Bytes())
-			// res, err := Cache.RemoveTypenameFromResponse(newResponse)
-			// if err != nil {
-			// 	fmt.Println("Error removing __typename:", err)
-			// 	return nil
-			// }
-			// fmt.Println("response bytes ", string(res.Bytes()))
-			// c.Response().Write(res.Bytes())
-			// c.Response().Header().Set("X-Proxy", "GraphQL Cache")
 			return nil
 		}
 
 		cachedResponse, err := Cache.ParseASTBuildResponse(astQuery, request)
 		if err == nil && cachedResponse != nil {
-			fmt.Println("serving response from cache...")
+			log.Println("serving response from cache...")
 			br, err := json.Marshal(cachedResponse)
 			if err != nil {
 				return err
 			}
-			fmt.Println("time taken to serve response from cache ", time.Since(start))
+			log.Println("time taken to serve response from cache ", time.Since(start))
 			graphqlresponse := graphcache.GraphQLResponse{Data: json.RawMessage(br)}
 			res, err := Cache.RemoveTypenameFromResponse(&graphqlresponse)
 			if err != nil {
-				fmt.Println("Error removing __typename:", err)
+				log.Println("Error removing __typename:", err)
 				return nil
 			}
 			return c.JSON(200, res)
 		}
 
-		transformedBody, err := transformer.TransformBody(request.Query, astQuery)
+		transformedBody, err := graphcache.AddTypenameToQuery(request.Query)
 		if err != nil {
-			fmt.Println("Error transforming body:", err)
+			log.Println("Error transforming body:", err)
 			return nil
 		}
 
-		fmt.Println("time taken to transform body ", time.Since(start))
+		log.Println("time taken to transform body ", time.Since(start))
 
 		transformedRequest := request
 		transformedRequest.Query = transformedBody
@@ -140,18 +120,18 @@ func CacheMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 		responseMap := make(map[string]interface{})
 		err = json.Unmarshal(resBody.Bytes(), &responseMap)
 		if err != nil {
-			fmt.Println("Error unmarshalling response:", err)
+			log.Println("Error unmarshalling response:", err)
 		}
 
-		fmt.Println("time taken to get response from API ", time.Since(start))
+		log.Println("time taken to get response from API ", time.Since(start))
 
-		astWithTypes, err := ast_utils.GetASTFromQuery(transformedRequest.Query)
+		astWithTypes, err := graphcache.GetASTFromQuery(transformedRequest.Query)
 		if err != nil {
-			fmt.Println("Error parsing query:", err)
+			log.Println("Error parsing query:", err)
 			return nil
 		}
 
-		fmt.Println("time taken to generate AST with types ", time.Since(start))
+		log.Println("time taken to generate AST with types ", time.Since(start))
 
 		reqVariables := transformedRequest.Variables
 		variables := make(map[string]interface{})
@@ -160,9 +140,7 @@ func CacheMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 		}
 
 		for _, op := range astWithTypes.Operations {
-			// for the operation op we need to traverse the response and the ast together to build a graph of the relations
-
-			// build the relation graph
+			// for the operation op we need to traverse the response and build the relationship map where key is the requested field and value is the key where the actual response is stored in the cache
 			responseKey := Cache.GetQueryResponseKey(op, responseMap, variables)
 			for key, value := range responseKey {
 				if value != nil {
@@ -171,7 +149,7 @@ func CacheMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 			}
 		}
 
-		fmt.Println("time taken to build response key ", time.Since(start))
+		log.Println("time taken to build response key ", time.Since(start))
 
 		// go through the response. Every object that has a __typename field, and an id field cache it in the format of typename:id
 		// for example, if the response has an object with __typename: "Organisation" and id: "1234", cache it as Organisation:1234
@@ -180,22 +158,9 @@ func CacheMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 
 		Cache.CacheResponse("data", responseMap, nil)
 
-		fmt.Println("time taken to cache response ", time.Since(start))
+		log.Println("time taken to cache response ", time.Since(start))
 
-		// cacheStore.Debug("cacheStore")
-		// recordCacheStore.Debug("recordCacheStore")
-		// queryCacheStore.Debug("queryCacheStore")
-
-		// cacheState, _ := cacheStore.JSON()
-		// fmt.Println(string(cacheState))
-
-		// recordCacheState, _ := recordCacheStore.JSON()
-		// fmt.Println(string(recordCacheState))
-
-		// queryCacheState, _ := queryCacheStore.JSON()
-		// fmt.Println(string(queryCacheState))
-
-		fmt.Println("time taken to finish completely ", time.Since(start))
+		// remove __typename from the response
 		newResponse := &graphcache.GraphQLResponse{}
 		newResponse.FromBytes(resBody.Bytes())
 		Cache.RemoveTypenameFromResponse(newResponse)
@@ -204,6 +169,9 @@ func CacheMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 	}
 }
 
+// bodyDumpResponseWrite is a custom response writer that writes the response body to a buffer
+// and also writes it to the actual response writer
+// this is used to read the response body after it has been written to the response writer
 type bodyDumpResponseWriter struct {
 	io.Writer
 	http.ResponseWriter

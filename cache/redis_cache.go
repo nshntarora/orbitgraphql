@@ -10,19 +10,10 @@ import (
 
 var ctx = context.Background()
 
+// RedisCache implements the Cache interface and uses Redis as the cache store
 type RedisCache struct {
 	cache *redis.Client
 }
-
-// var client *redis.Client
-
-// func init() {
-// 	client = redis.NewClient(&redis.Options{
-// 		Addr:     "localhost:6379",
-// 		Password: "", // no password set
-// 		DB:       1,  // use default DB
-// 	})
-// }
 
 func NewRedisCache() Cache {
 	c := redis.NewClient(&redis.Options{

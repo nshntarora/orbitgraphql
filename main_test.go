@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"graphql_cache/test_api/todo/db"
-	"graphql_cache/utils/test_endpoints"
+	"graphql_cache/test_client"
 	"testing"
 	"time"
 
@@ -12,7 +12,7 @@ import (
 
 const NUMBER_OF_USERS = 10
 
-func RunUsersOperations(t *testing.T, client *test_endpoints.GraphQLClient) time.Duration {
+func RunUsersOperations(t *testing.T, client *test_client.GraphQLClient) time.Duration {
 	totalTimeTaken := time.Duration(0)
 
 	deleted, tt, err := client.DeleteEverything()
@@ -112,7 +112,7 @@ func RunUsersOperations(t *testing.T, client *test_endpoints.GraphQLClient) time
 }
 
 func TestAPICacheTestSuite(t *testing.T) {
-	client := test_endpoints.NewGraphQLClient("http://localhost:9090/graphql", "http://localhost:9090")
+	client := test_client.NewGraphQLClient("http://localhost:9090/graphql", "http://localhost:9090")
 	defer client.DeleteEverything()
 	defer client.FlushCache()
 	timeTaken := RunUsersOperations(t, client)
@@ -120,7 +120,7 @@ func TestAPICacheTestSuite(t *testing.T) {
 }
 
 func TestAPIDefaultTestSuite(t *testing.T) {
-	client := test_endpoints.NewGraphQLClient("http://localhost:8080/graphql", "")
+	client := test_client.NewGraphQLClient("http://localhost:8080/graphql", "")
 	defer client.DeleteEverything()
 	defer client.FlushCache()
 	timeTaken := RunUsersOperations(t, client)

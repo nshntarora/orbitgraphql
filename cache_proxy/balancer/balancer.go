@@ -5,6 +5,7 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 )
 
+// DefaultProxyBalancer is a simple proxy balancer that always proxies to a single target instead of load balancing
 type DefaultProxyBalancer struct {
 	target *middleware.ProxyTarget
 }

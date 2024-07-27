@@ -1,4 +1,4 @@
-package ast_utils
+package graphcache
 
 import (
 	"github.com/vektah/gqlparser/ast"

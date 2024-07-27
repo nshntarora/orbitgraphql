@@ -5,6 +5,7 @@ import (
 	"graphql_cache/utils/file_utils"
 )
 
+// InMemoryCache implements the Cache interface and uses an in-memory map as the cache store
 type InMemoryCache struct {
 	cache map[string]interface{}
 }

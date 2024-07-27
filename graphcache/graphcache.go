@@ -12,48 +12,11 @@ import (
 	"github.com/vektah/gqlparser/ast"
 )
 
+// GraphCache is a struct that holds the cache stores for the GraphQL cache
 type GraphCache struct {
 	cacheStore       cache.Cache
 	recordCacheStore cache.Cache
 	queryCacheStore  cache.Cache
-}
-
-type GraphQLRequest struct {
-	Query     string                 `json:"query"`
-	Variables map[string]interface{} `json:"variables"`
-}
-
-func (gr *GraphQLRequest) Map() map[string]interface{} {
-	return map[string]interface{}{
-		"query":     gr.Query,
-		"variables": gr.Variables,
-	}
-}
-
-func (gr *GraphQLRequest) Bytes() []byte {
-	bytes, _ := json.Marshal(gr)
-	return bytes
-}
-
-type GraphQLResponse struct {
-	Data   json.RawMessage `json:"data"`
-	Errors []interface{}   `json:"errors"`
-}
-
-func (gr *GraphQLResponse) Map() map[string]interface{} {
-	return map[string]interface{}{
-		"data":   gr.Data,
-		"errors": gr.Errors,
-	}
-}
-
-func (gr *GraphQLResponse) Bytes() []byte {
-	bytes, _ := json.Marshal(gr)
-	return bytes
-}
-
-func (gr *GraphQLResponse) FromBytes(bytes []byte) {
-	json.Unmarshal(bytes, gr)
 }
 
 func NewGraphCache(backend string) *GraphCache {
@@ -399,8 +362,6 @@ func (gc *GraphCache) CacheResponse(field string, object map[string]interface{},
 	cacheKey := gc.CacheObject(field, object, parent)
 
 	return object, cacheKey
-
-	// return parent
 }
 
 func (gc *GraphCache) GetQueryResponseKey(queryDoc *ast.OperationDefinition, response map[string]interface{}, variables map[string]interface{}) map[string]interface{} {

@@ -1,33 +1,21 @@
-package transformer
+package graphcache
 
 import (
-	"fmt"
-	"graphql_cache/utils/ast_utils"
 	"strings"
 
 	"github.com/vektah/gqlparser/ast"
 )
 
-func TransformBody(queryString string, ast *ast.QueryDocument) (string, error) {
-	modifiedQuery, err := AddTypenameToQuery(queryString)
-	if err != nil {
-		fmt.Println("Error modifying query:", err)
-		return "", err
-	}
-
-	return modifiedQuery, nil
-}
-
 func AddTypenameToQuery(query string) (string, error) {
 
-	astQuery, err := ast_utils.GetASTFromQuery(query)
+	astQuery, err := GetASTFromQuery(query)
 	if err != nil {
 		return "", err
 	}
 
 	// Traverse and modify the AST
 	for _, operation := range astQuery.Operations {
-		operation.SelectionSet = ProcessSelectionSet(operation.SelectionSet)
+		operation.SelectionSet = processSelectionSet(operation.SelectionSet)
 	}
 
 	modifiedQuery := ""
@@ -90,13 +78,13 @@ func convertSelectionSetToString(selectionSet ast.SelectionSet) string {
 	return ""
 }
 
-func ProcessSelectionSet(selectionSet ast.SelectionSet) ast.SelectionSet {
+func processSelectionSet(selectionSet ast.SelectionSet) ast.SelectionSet {
 	updatedSelectionSets := make(ast.SelectionSet, 0)
 	for _, selection := range selectionSet {
 		if field, ok := selection.(*ast.Field); ok {
 			// Process the field
 			if len(field.SelectionSet) > 0 {
-				field.SelectionSet = ProcessSelectionSet(field.SelectionSet)
+				field.SelectionSet = processSelectionSet(field.SelectionSet)
 			}
 			updatedSelectionSets = append(updatedSelectionSets, field)
 		}

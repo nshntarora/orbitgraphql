@@ -1,4 +1,4 @@
-package test_endpoints
+package test_client
 
 import (
 	"bytes"
@@ -351,52 +351,4 @@ func (c *GraphQLClient) DeleteEverything() (bool, time.Duration, error) {
 	}
 
 	return result.DeleteEverything, time, nil
-}
-
-func RunTodosAPIRequests() {
-	// 	1. Create 5 users with random name, email, and username
-	// 2. Paginate users and see if the 5 are there
-	// 3. Update a user's name with the another random name
-	// 4. Get the updated user's id, and get that user to see if the name is updated
-
-	client := NewGraphQLClient("http://localhost:8080/graphql", "")
-
-	_, _, err := client.DeleteEverything()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	userIDToUpdate := ""
-	// Create 5 users
-	for i := 0; i < 5; i++ {
-		user, _, err := client.CreateRandomUser()
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-		userIDToUpdate = user.ID.String()
-	}
-
-	// Paginate users
-	_, _, err = client.PaginateUsers()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	// Update a user
-	_, _, err = client.UpdateUser(userIDToUpdate, "Updated Name", "", "")
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	// Get the updated user
-	_, _, err = client.GetUserByID(userIDToUpdate)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
 }

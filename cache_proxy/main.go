@@ -18,7 +18,6 @@ func main() {
 	e.Use(middleware.Recover())
 	e.Use(middleware.Logger())
 
-	// e.Use(cache_middleware.NewCacheMiddleware(gc))
 	apiSever, err := url.Parse(API_URL)
 	if err != nil {
 		e.Logger.Fatal(err)
@@ -53,25 +52,6 @@ func main() {
 
 	g.Use(middleware.ProxyWithConfig(middleware.ProxyConfig{
 		Balancer: balancer,
-		ModifyResponse: func(resp *http.Response) error {
-			// responseBody, err := io.ReadAll(resp.Body)
-			// if err != nil {
-			// 	fmt.Println("Error reading response body:", err)
-			// 	return err
-			// }
-			// newResponse := &graphcache.GraphQLResponse{}
-			// newResponse.FromBytes(responseBody)
-			// res, err := cache_middleware.Cache.RemoveTypenameFromResponse(newResponse)
-			// if err != nil {
-			// 	fmt.Println("Error removing __typename:", err)
-			// 	return nil
-			// }
-			// body := io.NopCloser(bytes.NewReader(res.Bytes()))
-			// resp.Body = body
-			// resp.ContentLength = int64(len(res.Bytes()))
-			// resp.Header.Set("Content-Length", strconv.Itoa(len(res.Bytes())))
-			return nil
-		},
 	}))
 
 	e.Logger.Fatal(e.Start(":9090"))
