@@ -55,11 +55,18 @@ func (gr *GraphQLResponse) FromBytes(bytes []byte) {
 	json.Unmarshal(bytes, gr)
 }
 
-func NewGraphCache() *GraphCache {
+func NewGraphCache(backend string) *GraphCache {
+	if backend == "redis" {
+		return &GraphCache{
+			cacheStore:       cache.NewRedisCache(),
+			recordCacheStore: cache.NewRedisCache(),
+			queryCacheStore:  cache.NewRedisCache(),
+		}
+	}
 	return &GraphCache{
-		cacheStore:       cache.NewRedisCache(),
-		recordCacheStore: cache.NewRedisCache(),
-		queryCacheStore:  cache.NewRedisCache(),
+		cacheStore:       cache.NewInMemoryCache(),
+		recordCacheStore: cache.NewInMemoryCache(),
+		queryCacheStore:  cache.NewInMemoryCache(),
 	}
 }
 
@@ -426,4 +433,94 @@ func (gc *GraphCache) hashVariables(variables map[string]interface{}) string {
 
 func (gc *GraphCache) hashString(str string) string {
 	return base64.StdEncoding.EncodeToString([]byte(str))
+}
+
+func (gc *GraphCache) InvalidateCache(field string, object map[string]interface{}, parent map[string]interface{}) (interface{}, string) {
+	for key, value := range object {
+		if nestedObj, ok := value.(map[string]interface{}); ok {
+			_, k := gc.InvalidateCache(key, nestedObj, object)
+			if k != "" {
+				object[key] = k
+			}
+		}
+		if objArray, ok := value.([]map[string]interface{}); ok {
+			responseObjects := make([]interface{}, 0)
+			for _, obj := range objArray {
+				_, k := gc.InvalidateCache(key, obj, object)
+				responseObjects = append(responseObjects, k)
+			}
+			if !utils.ArrayContains(responseObjects, "") {
+				object[key] = responseObjects
+			}
+		}
+		if objArray, ok := value.([]interface{}); ok {
+			responseObjects := make([]interface{}, 0)
+			for _, obj := range objArray {
+				if objMap, ok := obj.(map[string]interface{}); ok {
+					_, k := gc.InvalidateCache(key, objMap, object)
+					responseObjects = append(responseObjects, k)
+				}
+			}
+			if !utils.ArrayContains(responseObjects, "") {
+				object[key] = responseObjects
+			}
+		}
+	}
+
+	cacheKey := gc.InvalidateCacheObject(field, object, parent)
+
+	return object, cacheKey
+
+	// return parent
+}
+
+func (gc *GraphCache) InvalidateCacheObject(field string, object map[string]interface{}, parent map[string]interface{}) string {
+	objectKeys := make([]string, 0)
+
+	for key := range object {
+		// if _, ok := val.(map[string]interface{}); !ok {
+		// 	objectKeys = append(objectKeys, key)
+		// }
+		objectKeys = append(objectKeys, key)
+	}
+
+	parentKeys := make([]string, 0)
+
+	if parent != nil {
+		for key := range parent {
+			parentKeys = append(parentKeys, key)
+		}
+	}
+
+	if utils.StringArrayContainsString(objectKeys, "__typename") && utils.StringArrayContainsString(objectKeys, "id") {
+		typename := object["__typename"].(string)
+		id := object["id"].(string)
+		cacheKey := "gql:" + typename + ":" + id
+		gc.cacheStore.Del(cacheKey)
+
+		for key := range object {
+			gc.recordCacheStore.Del(cacheKey + ":" + key)
+		}
+
+		return cacheKey
+	} else if utils.StringArrayContainsString(objectKeys, "__typename") && !utils.StringArrayContainsString(objectKeys, "id") && parent != nil && utils.StringArrayContainsString(parentKeys, "id") && utils.StringArrayContainsString(parentKeys, "__typename") {
+		typename := parent["__typename"].(string)
+		parentID := parent["id"].(string)
+		cacheKey := "gql:" + typename + ":" + parentID + ":" + field
+		gc.cacheStore.Del(cacheKey)
+
+		for key := range object {
+			gc.recordCacheStore.Del(cacheKey + ":" + key)
+		}
+
+		return cacheKey
+	}
+
+	return ""
+}
+
+func (gc *GraphCache) Debug() {
+	gc.cacheStore.Debug("cacheStore")
+	gc.recordCacheStore.Debug("recordCacheStore")
+	gc.queryCacheStore.Debug("queryCacheStore")
 }

@@ -16,7 +16,7 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-var gc = graphcache.NewGraphCache()
+var Cache = graphcache.NewGraphCache("redis")
 
 func CacheMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
@@ -46,12 +46,59 @@ func CacheMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 
 		if astQuery.Operations[0].Operation == "mutation" {
 			// if the operation is a mutation, we don't cache it
-			c.Request().Body = io.NopCloser(bytes.NewBuffer(requestBytes))
+			// c.Request().Body = io.NopCloser(bytes.NewBuffer(requestBytes))
+			// c.Request().ContentLength = -1
+			transformedBody, err := transformer.TransformBody(request.Query, astQuery)
+			if err != nil {
+				fmt.Println("Error transforming body:", err)
+				return nil
+			}
+
+			fmt.Println("time taken to transform body ", time.Since(start))
+
+			transformedRequest := request
+			transformedRequest.Query = transformedBody
+
+			c.Request().Body = io.NopCloser(bytes.NewBuffer(transformedRequest.Bytes()))
 			c.Request().ContentLength = -1
-			return next(c)
+
+			resBody := new(bytes.Buffer)
+			mw := io.MultiWriter(c.Response().Writer, resBody)
+			writer := &bodyDumpResponseWriter{Writer: mw, ResponseWriter: c.Response().Writer}
+			c.Response().Writer = writer
+			err = next(c)
+			if err != nil {
+				return err
+			}
+			fmt.Println("found a mutation, invalidating cache...")
+
+			responseMap := make(map[string]interface{})
+			err = json.Unmarshal(resBody.Bytes(), &responseMap)
+			if err != nil {
+				fmt.Println("Error unmarshalling response:", err)
+			}
+
+			// go through the response. Every object that has a __typename field, and an id field cache it in the format of typename:id
+			// for example, if the response has an object with __typename: "Organisation" and id: "1234", cache it as Organisation:1234
+			// if the object has a nested object with __typename: "User" and id: "5678", cache
+			// it as User:5678
+
+			Cache.InvalidateCache("data", responseMap, nil)
+
+			// newResponse := &graphcache.GraphQLResponse{}
+			// newResponse.FromBytes(resBody.Bytes())
+			// res, err := Cache.RemoveTypenameFromResponse(newResponse)
+			// if err != nil {
+			// 	fmt.Println("Error removing __typename:", err)
+			// 	return nil
+			// }
+			// fmt.Println("response bytes ", string(res.Bytes()))
+			// c.Response().Write(res.Bytes())
+			// c.Response().Header().Set("X-Proxy", "GraphQL Cache")
+			return nil
 		}
 
-		cachedResponse, err := gc.ParseASTBuildResponse(astQuery, request)
+		cachedResponse, err := Cache.ParseASTBuildResponse(astQuery, request)
 		if err == nil && cachedResponse != nil {
 			fmt.Println("serving response from cache...")
 			br, err := json.Marshal(cachedResponse)
@@ -60,12 +107,7 @@ func CacheMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 			}
 			fmt.Println("time taken to serve response from cache ", time.Since(start))
 			graphqlresponse := graphcache.GraphQLResponse{Data: json.RawMessage(br)}
-			res, err := gc.RemoveTypenameFromResponse(&graphqlresponse)
-			if err != nil {
-				fmt.Println("Error removing __typename:", err)
-				return nil
-			}
-			return c.JSON(200, res)
+			return c.JSON(200, graphqlresponse)
 		}
 
 		transformedBody, err := transformer.TransformBody(request.Query, astQuery)
@@ -116,10 +158,10 @@ func CacheMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 			// for the operation op we need to traverse the response and the ast together to build a graph of the relations
 
 			// build the relation graph
-			responseKey := gc.GetQueryResponseKey(op, responseMap, variables)
+			responseKey := Cache.GetQueryResponseKey(op, responseMap, variables)
 			for key, value := range responseKey {
 				if value != nil {
-					gc.SetQueryCache(key, value)
+					Cache.SetQueryCache(key, value)
 				}
 			}
 		}
@@ -131,7 +173,7 @@ func CacheMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 		// if the object has a nested object with __typename: "User" and id: "5678", cache
 		// it as User:5678
 
-		gc.CacheResponse("data", responseMap, nil)
+		Cache.CacheResponse("data", responseMap, nil)
 
 		fmt.Println("time taken to cache response ", time.Since(start))
 
@@ -149,10 +191,10 @@ func CacheMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 		// fmt.Println(string(queryCacheState))
 
 		fmt.Println("time taken to finish completely ", time.Since(start))
-		newResponse := &graphcache.GraphQLResponse{}
-		newResponse.FromBytes(resBody.Bytes())
-		gc.RemoveTypenameFromResponse(newResponse)
-		c.Response().Header().Set("X-Proxy", "GraphQL Cache")
+		// newResponse := &graphcache.GraphQLResponse{}
+		// newResponse.FromBytes(resBody.Bytes())
+		// Cache.RemoveTypenameFromResponse(newResponse)
+		// c.Response().Header().Set("X-Proxy", "GraphQL Cache")
 		return nil
 	}
 }

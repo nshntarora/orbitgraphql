@@ -43,7 +43,7 @@ func (c *InMemoryCache) JSON() ([]byte, error) {
 }
 
 func (c *InMemoryCache) Debug(identifier string) error {
-	f := file_utils.NewFile(identifier + ".cache.json")
+	f := file_utils.NewFile("../" + identifier + ".cache.json")
 	defer f.Close()
 	jsonContent, _ := c.JSON()
 	f.Write(string(jsonContent))

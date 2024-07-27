@@ -71,7 +71,10 @@ func (d Connection) PaginateUsers(users *[]User, query *string, page, perPage *i
 
 func (d Connection) UpdateUser(id string, name, email, username *string) error {
 	var user User
-	d.DB.Where("id=?", id).Find(&user)
+	err := d.DB.Where("id=?", id).First(&user)
+	if err.Error != nil {
+		return err.Error
+	}
 	if name != nil {
 		user.Name = *name
 	}
@@ -87,7 +90,7 @@ func (d Connection) UpdateUser(id string, name, email, username *string) error {
 
 func (d Connection) DeleteUser(id string) error {
 	var user User
-	d.DB.Where("id=?", id).Find(&user)
+	d.DB.Where("id=?", id).First(&user)
 	return d.DB.Delete(&user).Error
 }
 
@@ -121,7 +124,7 @@ func (d Connection) PaginateTodos(todos *[]Todo, query *string, page, perPage *i
 
 func (d Connection) UpdateTodo(id, text string) error {
 	var todo Todo
-	d.DB.Where("id=?", id).Find(&todo)
+	d.DB.Where("id=?", id).First(&todo)
 	if text != "" {
 		todo.Text = text
 	}
@@ -131,7 +134,7 @@ func (d Connection) UpdateTodo(id, text string) error {
 
 func (d Connection) UpdateTodoAsDone(id string) error {
 	var todo Todo
-	d.DB.Where("id=?", id).Find(&todo)
+	d.DB.Where("id=?", id).First(&todo)
 	todo.Done = true
 	todo.UpdatedAt = time.Now()
 	return d.DB.Save(&todo).Error
@@ -139,7 +142,7 @@ func (d Connection) UpdateTodoAsDone(id string) error {
 
 func (d Connection) UpdateTodoAsIncomplete(id string) error {
 	var todo Todo
-	d.DB.Where("id=?", id).Find(&todo)
+	d.DB.Where("id=?", id).First(&todo)
 	todo.Done = false
 	todo.UpdatedAt = time.Now()
 	return d.DB.Save(&todo).Error
@@ -147,13 +150,13 @@ func (d Connection) UpdateTodoAsIncomplete(id string) error {
 
 func (d Connection) GetTodoByID(id string) (Todo, error) {
 	var todo Todo
-	err := d.DB.Where("id=?", id).Find(&todo)
+	err := d.DB.Where("id=?", id).First(&todo)
 	return todo, err.Error
 }
 
 func (d Connection) DeleteTodo(id string) error {
 	var todo Todo
-	d.DB.Where("id=?", id).Find(&todo)
+	d.DB.Where("id=?", id).First(&todo)
 	return d.DB.Delete(&todo).Error
 }
 

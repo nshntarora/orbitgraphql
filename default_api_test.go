@@ -32,7 +32,7 @@ func TestCachedTodoAPI(t *testing.T) {
 	userIDToUpdate := ""
 	// Create 5 users
 	createdUsers := []db.User{}
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 10; i++ {
 		user, tt, err := client.CreateRandomUser()
 		if err != nil {
 			fmt.Println(err)
@@ -46,7 +46,7 @@ func TestCachedTodoAPI(t *testing.T) {
 	assert.NotNil(t, userIDToUpdate)
 
 	// Paginate users
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 10; i++ {
 		users, tt, err := client.PaginateUsers()
 		if err != nil {
 			fmt.Println(err)
@@ -54,7 +54,7 @@ func TestCachedTodoAPI(t *testing.T) {
 		}
 		totalTimeTaken += tt
 
-		assert.Equal(t, 5, len(users))
+		assert.Equal(t, 10, len(users))
 		assert.Equal(t, createdUsers, users)
 	}
 
@@ -72,7 +72,7 @@ func TestCachedTodoAPI(t *testing.T) {
 	}
 	totalTimeTaken += tt
 
-	assert.Equal(t, 6, len(users))
+	assert.Equal(t, 11, len(users))
 
 	_, tt, err = client.GetUserByID(userIDToUpdate)
 	if err != nil {
@@ -91,7 +91,7 @@ func TestCachedTodoAPI(t *testing.T) {
 
 	assert.Equal(t, "Updated Name", user.Name)
 
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 10; i++ {
 		updatedUser, tt, err := client.GetUserByID(userIDToUpdate)
 		if err != nil {
 			fmt.Println(err)
@@ -126,7 +126,7 @@ func TestDefaultTodoAPI(t *testing.T) {
 
 	userIDToUpdate := ""
 	// Create 5 users
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 10; i++ {
 		user, tt, err := client.CreateRandomUser()
 		if err != nil {
 			fmt.Println(err)
@@ -139,7 +139,7 @@ func TestDefaultTodoAPI(t *testing.T) {
 
 	assert.NotNil(t, userIDToUpdate)
 
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 10; i++ {
 		users, tt, err := client.PaginateUsers()
 		if err != nil {
 			fmt.Println(err)
@@ -147,7 +147,7 @@ func TestDefaultTodoAPI(t *testing.T) {
 		}
 		totalTimeTaken += tt
 
-		assert.Equal(t, 5, len(users))
+		assert.Equal(t, 10, len(users))
 	}
 
 	_, tt, err = client.CreateRandomUser()
@@ -164,7 +164,7 @@ func TestDefaultTodoAPI(t *testing.T) {
 	}
 	totalTimeTaken += tt
 
-	assert.Equal(t, 6, len(users))
+	assert.Equal(t, 11, len(users))
 
 	_, tt, err = client.GetUserByID(userIDToUpdate)
 	if err != nil {
@@ -183,7 +183,7 @@ func TestDefaultTodoAPI(t *testing.T) {
 
 	assert.Equal(t, "Updated Name", user.Name)
 
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 10; i++ {
 		updatedUser, tt, err := client.GetUserByID(userIDToUpdate)
 		if err != nil {
 			fmt.Println(err)
