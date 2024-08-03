@@ -31,8 +31,6 @@ jobs:
           wait-on: |
             http://localhost:8080
           tail: true
-          wait-for: 30s
-          log-output-if: failure
 
       - name: Start Cache API
         uses: JarvusInnovations/background-action@v1
@@ -41,8 +39,6 @@ jobs:
           wait-on: |
             http://localhost:9090
           tail: true
-          wait-for: 30s
-          log-output-if: failure
 
       - name: Run Tests
         run: |
