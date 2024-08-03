@@ -12,13 +12,13 @@ import (
 
 const NUMBER_OF_USERS = 10
 
-func RunUsersOperations(t *testing.T, client *test_client.GraphQLClient) time.Duration {
+func RunUsersOperations(t *testing.T, client *test_client.GraphQLClient) (time.Duration, error) {
 	totalTimeTaken := time.Duration(0)
 
 	deleted, tt, err := client.DeleteEverything()
 	if err != nil {
-		fmt.Println(err)
-		return totalTimeTaken
+		fmt.Println("error resetting database ", err)
+		return totalTimeTaken, err
 	}
 
 	totalTimeTaken += tt
@@ -33,8 +33,8 @@ func RunUsersOperations(t *testing.T, client *test_client.GraphQLClient) time.Du
 	for i := 0; i < NUMBER_OF_USERS; i++ {
 		user, tt, err := client.CreateRandomUser()
 		if err != nil {
-			fmt.Println(err)
-			return totalTimeTaken
+			fmt.Println("error creating user ", err)
+			return totalTimeTaken, err
 		}
 		totalTimeTaken += tt
 		userIDToUpdate = user.ID.String()
@@ -47,8 +47,8 @@ func RunUsersOperations(t *testing.T, client *test_client.GraphQLClient) time.Du
 	for i := 0; i < NUMBER_OF_USERS; i++ {
 		users, tt, err := client.PaginateUsers()
 		if err != nil {
-			fmt.Println(err)
-			return totalTimeTaken
+			fmt.Println("error paginating users ", err)
+			return totalTimeTaken, err
 		}
 		totalTimeTaken += tt
 
@@ -58,8 +58,8 @@ func RunUsersOperations(t *testing.T, client *test_client.GraphQLClient) time.Du
 
 	user, tt, err := client.CreateRandomUser()
 	if err != nil {
-		fmt.Println(err)
-		return totalTimeTaken
+		fmt.Println("error creating user ", err)
+		return totalTimeTaken, err
 	}
 	totalTimeTaken += tt
 
@@ -67,8 +67,8 @@ func RunUsersOperations(t *testing.T, client *test_client.GraphQLClient) time.Du
 
 	users, tt, err := client.PaginateUsers()
 	if err != nil {
-		fmt.Println(err)
-		return totalTimeTaken
+		fmt.Println("error paginating users ", err)
+		return totalTimeTaken, err
 	}
 	totalTimeTaken += tt
 
@@ -78,8 +78,8 @@ func RunUsersOperations(t *testing.T, client *test_client.GraphQLClient) time.Du
 
 		user, tt, err = client.GetUserByID(userIDToUpdate)
 		if err != nil {
-			fmt.Println(err)
-			return totalTimeTaken
+			fmt.Println("error fetching user", err)
+			return totalTimeTaken, err
 		}
 		totalTimeTaken += tt
 
@@ -90,8 +90,8 @@ func RunUsersOperations(t *testing.T, client *test_client.GraphQLClient) time.Du
 	// Update a user
 	user, tt, err = client.UpdateUser(userIDToUpdate, "Updated Name", "", "")
 	if err != nil {
-		fmt.Println(err)
-		return totalTimeTaken
+		fmt.Println("error updating user ", err)
+		return totalTimeTaken, err
 	}
 	totalTimeTaken += tt
 
@@ -100,15 +100,15 @@ func RunUsersOperations(t *testing.T, client *test_client.GraphQLClient) time.Du
 	for i := 0; i < NUMBER_OF_USERS; i++ {
 		updatedUser, tt, err := client.GetUserByID(userIDToUpdate)
 		if err != nil {
-			fmt.Println(err)
-			return totalTimeTaken
+			fmt.Println("error fetching user ", err)
+			return totalTimeTaken, err
 		}
 		totalTimeTaken += tt
 
 		assert.Equal(t, "Updated Name", updatedUser.Name)
 	}
 
-	return totalTimeTaken
+	return totalTimeTaken, nil
 
 }
 
@@ -116,7 +116,8 @@ func TestAPICacheTestSuite(t *testing.T) {
 	client := test_client.NewGraphQLClient("http://localhost:9090/graphql", "http://localhost:9090")
 	defer client.DeleteEverything()
 	defer client.FlushCache()
-	timeTaken := RunUsersOperations(t, client)
+	timeTaken, err := RunUsersOperations(t, client)
+	assert.Nil(t, err)
 	fmt.Printf("Total time taken for Cached Todo API: %v\n", timeTaken)
 }
 
@@ -124,7 +125,8 @@ func TestAPIDefaultTestSuite(t *testing.T) {
 	client := test_client.NewGraphQLClient("http://localhost:8080/graphql", "")
 	defer client.DeleteEverything()
 	defer client.FlushCache()
-	timeTaken := RunUsersOperations(t, client)
+	timeTaken, err := RunUsersOperations(t, client)
+	assert.Nil(t, err)
 	fmt.Printf("Total time taken for Default Todo API: %v\n", timeTaken)
 }
 
@@ -142,7 +144,7 @@ func TestAPIResponseConsistency(t *testing.T) {
 	for i := 0; i < NUMBER_OF_USERS; i++ {
 		user, _, err := cacheClient.CreateRandomUser()
 		if err != nil {
-			fmt.Println(err)
+			fmt.Println("error ", err)
 			return
 		}
 		createdUsers = append(createdUsers, *user)
@@ -155,7 +157,7 @@ func TestAPIResponseConsistency(t *testing.T) {
 	for i := 0; i < NUMBER_OF_USERS; i++ {
 		users, tt, err := cacheClient.PaginateUsers()
 		if err != nil {
-			fmt.Println(err)
+			fmt.Println("error ", err)
 			return
 		}
 		cachedUsersResponses = append(cachedUsersResponses, users...)
@@ -167,7 +169,7 @@ func TestAPIResponseConsistency(t *testing.T) {
 	for i := 0; i < NUMBER_OF_USERS; i++ {
 		users, tt, err := defaultClient.PaginateUsers()
 		if err != nil {
-			fmt.Println(err)
+			fmt.Println("error ", err)
 			return
 		}
 		defaultUserResponses = append(defaultUserResponses, users...)

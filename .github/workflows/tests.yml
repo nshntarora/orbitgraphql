@@ -12,7 +12,7 @@ on:
       - "*"
 
 jobs:
-  RunTest:
+  RunTests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -24,11 +24,26 @@ jobs:
           cache-dependency-path: |
             go.sum
 
-      - name: Launch Test Server (todo)
-        run: go run test_api/todo/server.go & sleep 5
+      - name: Start Todo API
+        uses: JarvusInnovations/background-action@v1
+        with:
+          run: go run test_api/todo/server.go
+          wait-on: |
+            http://localhost:8080
+          tail: true
+          wait-for: 30s
+          log-output-if: failure
 
-      - name: Launch Cache Server
-        run: go run main.go & sleep 5
+      - name: Start Cache API
+        uses: JarvusInnovations/background-action@v1
+        with:
+          run: go run main.go
+          wait-on: |
+            http://localhost:9090
+          tail: true
+          wait-for: 30s
+          log-output-if: failure
 
-      - name: Run Test
-        run: go test -v ./...
+      - name: Run Tests
+        run: |
+          go test -v ./...

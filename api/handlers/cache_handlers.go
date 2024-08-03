@@ -73,7 +73,7 @@ func GetCacheHandler(cache *graphcache.GraphCache, cfg *config.Config) http.Hand
 			client := http.Client{}
 			// Send the proxy request using the custom transport
 			resp, err := client.Do(proxyReq)
-			if err != nil {
+			if err != nil || resp == nil {
 				http.Error(w, "Error sending proxy request", http.StatusInternalServerError)
 
 			}
@@ -98,7 +98,7 @@ func GetCacheHandler(cache *graphcache.GraphCache, cfg *config.Config) http.Hand
 			responseMap := make(map[string]interface{})
 			err = json.Unmarshal(responseBody.Bytes(), &responseMap)
 			if err != nil {
-				log.Println("Error unmarshalling response:", err)
+				log.Println("Error unmarshalling response:", err, string(responseBody.Bytes()))
 			}
 
 			cache.InvalidateCache("data", responseMap, nil)
@@ -148,7 +148,7 @@ func GetCacheHandler(cache *graphcache.GraphCache, cfg *config.Config) http.Hand
 		responseMap := make(map[string]interface{})
 		err = json.Unmarshal(responseBody.Bytes(), &responseMap)
 		if err != nil {
-			log.Println("Error unmarshalling response:", err)
+			log.Println("Error unmarshalling response:", err, string(responseBody.Bytes()))
 		}
 
 		log.Println("time taken to get response from API ", time.Since(start))

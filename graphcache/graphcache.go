@@ -47,7 +47,7 @@ func (gc *GraphCache) RemoveTypenameFromResponse(response *GraphQLResponse) (*Gr
 	}
 	err = json.Unmarshal(responseBytes, &mapResponse)
 	if err != nil {
-		fmt.Println("Error unmarshalling response:", err)
+		fmt.Println("Error unmarshalling response: ", err, string(responseBytes))
 		return nil, err
 	}
 
@@ -62,7 +62,7 @@ func (gc *GraphCache) RemoveTypenameFromResponse(response *GraphQLResponse) (*Gr
 	gres := GraphQLResponse{}
 	err = json.Unmarshal(br, &gres)
 	if err != nil {
-		fmt.Println("Error unmarshalling response:", err)
+		fmt.Println("Error unmarshalling response:", err, string(br))
 		return nil, err
 	}
 
