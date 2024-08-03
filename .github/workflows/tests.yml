@@ -28,6 +28,10 @@ jobs:
         run: |
           go run test_api/todo/server.go &
           go run main.go &
+          go install github.com/bitnami/wait-for-port
+          wait-for-port 8080
+          wait-for-port 9090
+          go test -v ./...
 
       - name: Wait for Todo Server
         run: |
