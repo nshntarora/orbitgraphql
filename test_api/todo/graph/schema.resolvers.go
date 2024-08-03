@@ -6,6 +6,7 @@ package graph
 
 import (
 	"context"
+	"errors"
 	"graphql_cache/test_api/todo/db"
 	"graphql_cache/test_api/todo/graph/model"
 	"time"
@@ -86,7 +87,10 @@ func (r *mutationResolver) CreateUser(ctx context.Context, name string, email st
 		Username: username,
 	}
 
-	r.DB.CreateUser(&user)
+	err := r.DB.CreateUser(&user)
+	if err != nil {
+		return nil, err
+	}
 
 	return &user, nil
 }
@@ -164,8 +168,11 @@ func (r *queryResolver) Users(ctx context.Context, query *string, page *int, per
 func (r *queryResolver) User(ctx context.Context, id string) (*db.User, error) {
 	user := db.User{}
 	err := r.DB.GetUserByID(id, &user)
-	if err != nil || user.ID == uuid.Nil {
+	if err != nil {
 		return nil, err
+	}
+	if user.ID == uuid.Nil {
+		return nil, errors.New("user not found")
 	}
 	return &user, nil
 }

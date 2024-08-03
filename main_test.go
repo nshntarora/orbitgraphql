@@ -20,6 +20,7 @@ func RunUsersOperations(t *testing.T, client *test_client.GraphQLClient) time.Du
 		fmt.Println(err)
 		return totalTimeTaken
 	}
+
 	totalTimeTaken += tt
 
 	client.FlushCache()
@@ -125,4 +126,57 @@ func TestAPIDefaultTestSuite(t *testing.T) {
 	defer client.FlushCache()
 	timeTaken := RunUsersOperations(t, client)
 	fmt.Printf("Total time taken for Default Todo API: %v\n", timeTaken)
+}
+
+func TestAPIResponseConsistency(t *testing.T) {
+	cacheClient := test_client.NewGraphQLClient("http://localhost:9090/graphql", "http://localhost:9090")
+	cacheClient.DeleteEverything()
+	cacheClient.FlushCache()
+
+	defaultClient := test_client.NewGraphQLClient("http://localhost:8080/graphql", "")
+
+	// run all mutations, then run all queries on the cached api and the default API, then compare the responses. If the responses do not match, the test fails.
+
+	// Create 5 users
+	createdUsers := []db.User{}
+	for i := 0; i < NUMBER_OF_USERS; i++ {
+		user, _, err := cacheClient.CreateRandomUser()
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		createdUsers = append(createdUsers, *user)
+	}
+
+	cachedUsersResponses := []db.User{}
+
+	timeTakenForCacheClient := time.Duration(0)
+
+	for i := 0; i < NUMBER_OF_USERS; i++ {
+		users, tt, err := cacheClient.PaginateUsers()
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		cachedUsersResponses = append(cachedUsersResponses, users...)
+		timeTakenForCacheClient += tt
+	}
+
+	defaultUserResponses := []db.User{}
+	timeTakenForDefaultClient := time.Duration(0)
+	for i := 0; i < NUMBER_OF_USERS; i++ {
+		users, tt, err := defaultClient.PaginateUsers()
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		defaultUserResponses = append(defaultUserResponses, users...)
+		timeTakenForDefaultClient += tt
+	}
+
+	fmt.Println("Time taken for cached API: ", timeTakenForCacheClient)
+	fmt.Println("Time taken for default API: ", timeTakenForDefaultClient)
+
+	assert.Equal(t, len(cachedUsersResponses), len(defaultUserResponses))
+	assert.Equal(t, cachedUsersResponses, defaultUserResponses)
 }

@@ -18,3 +18,7 @@ func (gr *GraphQLRequest) Bytes() []byte {
 	bytes, _ := json.Marshal(gr)
 	return bytes
 }
+
+func (gr *GraphQLRequest) FromBytes(req []byte) {
+	json.Unmarshal(req, gr)
+}

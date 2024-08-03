@@ -80,7 +80,7 @@ func (c *GraphQLClient) FlushByType(typeName, id string) error {
 		return err
 	}
 
-	resp, err := http.Post(c.baseURL+"/flushType", "application/json", bytes.NewBuffer(requestBody))
+	resp, err := http.Post(c.baseURL+"/flush.type", "application/json", bytes.NewBuffer(requestBody))
 	if err != nil {
 		return err
 	}

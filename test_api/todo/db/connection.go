@@ -2,6 +2,7 @@ package db
 
 import (
 	"fmt"
+	"log"
 	"time"
 
 	"gorm.io/driver/sqlite"
@@ -13,10 +14,12 @@ func Setup() Connection {
 	db, err := gorm.Open(sqlite.Open("todos.db"), &gorm.Config{})
 	if err != nil {
 		fmt.Println(err.Error())
-		panic("failed to connect database")
+		log.Panic("failed to connect database")
 	}
+	fmt.Println("running migrations...")
 	db.AutoMigrate(&User{})
 	db.AutoMigrate(&Todo{})
+	defer fmt.Println("database connection set up")
 	return NewConnection(db)
 }
 
@@ -25,7 +28,7 @@ func Close(db *gorm.DB) {
 	sqlDB, err := db.DB()
 	if err != nil {
 		fmt.Println(err.Error())
-		panic("failed to close database")
+		log.Panic("failed to close database")
 	}
 	sqlDB.Close()
 }

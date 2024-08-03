@@ -403,11 +403,10 @@ func (gc *GraphCache) GetResponseTypeID(selectionSet ast.SelectionSet, response 
 		// for example, Organisation:1234
 
 		selection := updatedSelectionSet[0].(*ast.Field)
-		// fmt.Println(reflect.TypeOf(response[selection.Name]).String() == "map[string]interface{}")
-		// fmt.Println(reflect.TypeOf(response[selection.Name]).String() == "map[string]interface {}")
-		// fmt.Println(reflect.TypeOf(response[selection.Name]).Kind())
-		// fmt.Println(reflect.TypeOf(response[selection.Name]).Elem())
-		// fmt.Println(reflect.TypeOf(response[selection.Name]).String())
+
+		if response[selection.Name] == nil {
+			return nil
+		}
 
 		switch reflect.TypeOf(response[selection.Name]).Kind() {
 		case reflect.Map:
@@ -433,19 +432,6 @@ func (gc *GraphCache) GetResponseTypeID(selectionSet ast.SelectionSet, response 
 				return map[string]interface{}{updatedSelectionSet[0].(*ast.Field).Name: responseObjects}
 			}
 		}
-
-		// selectionRespone, ok := response[selection.Name].(map[string]interface{})
-		// if ok && selectionRespone != nil && selectionRespone["id"] != nil && selectionRespone["__typename"] != nil {
-		// 	id := selectionRespone["id"].(string)
-		// 	typeName := selectionRespone["__typename"].(string)
-		// 	return map[string]interface{}{updatedSelectionSet[0].(*ast.Field).Name: "gql:" + typeName + ":" + id}
-		// }
-		// selectionRespone, ok = response[selection.Name].([]interface{})
-		// if ok && selectionRespone != nil && selectionRespone["id"] != nil && selectionRespone["__typename"] != nil {
-		// 	id := selectionRespone["id"].(string)
-		// 	typeName := selectionRespone["__typename"].(string)
-		// 	return map[string]interface{}{updatedSelectionSet[0].(*ast.Field).Name: "gql:" + typeName + ":" + id}
-		// }
 	}
 	return nil
 }

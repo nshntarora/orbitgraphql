@@ -18,6 +18,14 @@ import (
 const defaultPort = "8080"
 
 func main() {
+	fmt.Println(`
+___  __   __   __  
+ |  /  \ |  \ /  \ 
+ |  \__/ |__/ \__/ 
+                   
+Todo List GraphQL Server for graph_cache tests
+	`)
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = defaultPort
@@ -30,9 +38,6 @@ func main() {
 
 	srv.AroundOperations(func(ctx context.Context, next graphql.OperationHandler) graphql.ResponseHandler {
 		time.Sleep(100 * time.Millisecond)
-		opctx := graphql.GetOperationContext(ctx)
-		// opctx.Doc
-		fmt.Println(opctx.Doc)
 		response := next(ctx)
 		return response
 	})
@@ -40,6 +45,7 @@ func main() {
 	http.Handle("/", playground.Handler("GraphQL playground", "/graphql"))
 	http.Handle("/graphql", srv)
 
-	log.Printf("connect to http://127.0.0.1:%s/ for GraphQL playground", port)
+	fmt.Printf("connect to http://127.0.0.1:%s/ for GraphQL playground", port)
+	fmt.Println("\ngraphql API is available on http://127.0.0.1:" + port + "/graphql")
 	log.Fatal(http.ListenAndServe("127.0.0.1:"+port, nil))
 }
