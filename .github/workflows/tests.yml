@@ -24,21 +24,16 @@ jobs:
           cache-dependency-path: |
             go.sum
 
-      - name: Start Todo API
-        uses: JarvusInnovations/background-action@v1
-        with:
-          run: go run test_api/todo/server.go
-          wait-on: |
-            http://localhost:8080
-          tail: true
+      - name: Start Todo Server
+        run: |
+          go run test_api/todo/server.go &
+          go run main.go &
 
-      - name: Start Cache API
-        uses: JarvusInnovations/background-action@v1
-        with:
-          run: go run main.go
-          wait-on: |
-            http://localhost:9090
-          tail: true
+      - name: Wait for Todo Server
+        run: |
+          go install github.com/bitnami/wait-for-port
+          wait-for-port 8080
+          wait-for-port 9090
 
       - name: Run Tests
         run: |
