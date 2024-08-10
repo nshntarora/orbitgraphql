@@ -1,9 +1,15 @@
+directive @goField(
+  forceResolver: Boolean
+  name: String
+  omittable: Boolean
+) on INPUT_FIELD_DEFINITION | FIELD_DEFINITION
+
 type Todo {
   id: ID!
   text: String!
   done: Boolean!
   userId: String!
-  user: User!
+  user: User! @goField(forceResolver: true)
   createdAt: String!
   updatedAt: String!
 }
@@ -13,9 +19,17 @@ type User {
   name: String!
   email: String!
   username: String!
-  todos: [Todo!]!
+  todos: [Todo!]! @goField(forceResolver: true)
   createdAt: String!
   updatedAt: String!
+  meta: MetaInfo! @goField(forceResolver: true)
+  tags: [String!]!
+}
+
+type MetaInfo {
+  ipAddress: String
+  userAgent: String
+  createdEpoch: Int
 }
 
 type Query {

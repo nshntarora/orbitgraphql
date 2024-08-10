@@ -53,7 +53,7 @@ func RunUsersOperations(t *testing.T, client *test_client.GraphQLClient) (time.D
 		totalTimeTaken += tt
 
 		assert.Equal(t, NUMBER_OF_USERS, len(users))
-		// assert.Equal(t, createdUsers, users)
+		assert.Equal(t, createdUsers, users)
 	}
 
 	user, tt, err := client.CreateRandomUser()
@@ -103,6 +103,8 @@ func RunUsersOperations(t *testing.T, client *test_client.GraphQLClient) (time.D
 			fmt.Println("error fetching user ", err)
 			return totalTimeTaken, err
 		}
+		assert.Greater(t, len(updatedUser.Tags), 1)
+		assert.Contains(t, updatedUser.Meta, "ipAddress")
 		totalTimeTaken += tt
 
 		assert.Equal(t, "Updated Name", updatedUser.Name)
@@ -181,4 +183,70 @@ func TestAPIResponseConsistency(t *testing.T) {
 
 	assert.Equal(t, len(cachedUsersResponses), len(defaultUserResponses))
 	assert.Equal(t, cachedUsersResponses, defaultUserResponses)
+}
+
+func TestWithTodoOperations(t *testing.T) {
+	client := test_client.NewGraphQLClient("http://localhost:9090/graphql", "http://localhost:9090")
+	defer client.DeleteEverything()
+	defer client.FlushCache()
+
+	user, _, err := client.CreateRandomUser()
+	assert.Nil(t, err)
+
+	userID := user.ID.String()
+
+	for i := 0; i < 10; i++ {
+		todo, _, err := client.CreateRandomTodo(userID)
+		assert.Nil(t, err)
+		assert.NotNil(t, todo)
+	}
+
+	todo, _, err := client.CreateRandomTodo(userID)
+	assert.Nil(t, err)
+	assert.NotNil(t, todo)
+
+	todoID := todo.ID.String()
+
+	// Get the todo
+	todoResponse, _, err := client.GetTodoByID(todoID)
+	assert.Nil(t, err)
+	assert.NotNil(t, todoResponse)
+
+	assert.NotNil(t, todoResponse)
+	assert.Equal(t, todo.ID, todoResponse.ID)
+	assert.Equal(t, todo.Text, todoResponse.Text)
+	assert.Equal(t, todo.Done, todoResponse.Done)
+
+	// Update the todo
+	todoResponse, _, err = client.MarkTodoAsDone(todoID)
+	assert.Nil(t, err)
+	assert.NotNil(t, todoResponse)
+
+	assert.NotNil(t, todoResponse)
+	assert.Equal(t, todo.ID, todoResponse.ID)
+	assert.Equal(t, todo.Text, todoResponse.Text)
+	assert.Equal(t, true, todoResponse.Done)
+
+	// get the todo again
+	todoResponse, _, err = client.GetTodoByID(todoID)
+	assert.Nil(t, err)
+	assert.NotNil(t, todoResponse)
+
+	assert.NotNil(t, todoResponse)
+	assert.Equal(t, todo.ID, todoResponse.ID)
+	assert.Equal(t, todo.Text, todoResponse.Text)
+	assert.Equal(t, true, todoResponse.Done)
+	assert.Nil(t, todoResponse.User)
+
+	// get the todo with user
+	todoResponse, _, err = client.GetTodoByIDWithUser(todoID)
+	assert.Nil(t, err)
+	assert.NotNil(t, todoResponse)
+
+	assert.NotNil(t, todoResponse)
+	assert.Equal(t, todo.ID, todoResponse.ID)
+	assert.Equal(t, todo.Text, todoResponse.Text)
+	assert.Equal(t, true, todoResponse.Done)
+	assert.NotNil(t, todoResponse.User)
+	assert.Equal(t, userID, todoResponse.User.ID.String())
 }

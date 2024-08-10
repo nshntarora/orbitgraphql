@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"graphql_cache/utils/file_utils"
+	"regexp"
 	"strings"
 )
 
@@ -66,8 +67,12 @@ func (c *InMemoryCache) Flush() error {
 }
 
 func (c *InMemoryCache) DeleteByPrefix(prefix string) error {
+	var re = regexp.MustCompile(`(?m)` + strings.ReplaceAll(prefix, "*", ".*"))
+
 	for k := range c.data {
-		if strings.HasPrefix(k, prefix) {
+		// regex match the prefix to the key
+		// if the key is gql:* then delete all keys which start with gql
+		if re.Match([]byte(k)) {
 			c.Del(k)
 		}
 	}

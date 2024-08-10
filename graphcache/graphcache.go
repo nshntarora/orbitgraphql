@@ -101,7 +101,7 @@ func (gc *GraphCache) deleteTypename(data interface{}) interface{} {
 	return data
 }
 
-func (gc *GraphCache) ParseASTBuildResponse(astQuery *ast.QueryDocument, requestBody GraphQLRequest) (interface{}, error) {
+func (gc *GraphCache) ParseASTBuildResponse(queryPrefix string, astQuery *ast.QueryDocument, requestBody GraphQLRequest) (interface{}, error) {
 
 	queryDoc := astQuery.Operations[0]
 
@@ -121,7 +121,7 @@ func (gc *GraphCache) ParseASTBuildResponse(astQuery *ast.QueryDocument, request
 		variableDefinitions = append(variableDefinitions, val.Variable+":"+string(variableBytes))
 	}
 
-	queryResponseKey := "gql:" + string(queryType) + ":" + parentKey + "(" + gc.hashString(strings.Join(variableDefinitions, ",")) + ")"
+	queryResponseKey := "gql:" + queryPrefix + ":" + string(queryType) + ":" + parentKey + "(" + gc.hashString(strings.Join(variableDefinitions, ",")) + ")"
 
 	cachedResponse, err := gc.queryCacheStore.Get(queryResponseKey)
 	if err == nil && cachedResponse != nil {
@@ -285,7 +285,7 @@ func (gc *GraphCache) TraverseResponseFromKey(response interface{}) (interface{}
 	return nil, errors.New("error traversing response from key")
 }
 
-func (gc *GraphCache) CacheObject(field string, object map[string]interface{}, parent map[string]interface{}) string {
+func (gc *GraphCache) CacheObject(queryPrefix string, field string, object map[string]interface{}, parent map[string]interface{}) string {
 	objectKeys := make([]string, 0)
 
 	for key := range object {
@@ -297,16 +297,14 @@ func (gc *GraphCache) CacheObject(field string, object map[string]interface{}, p
 
 	parentKeys := make([]string, 0)
 
-	if parent != nil {
-		for key := range parent {
-			parentKeys = append(parentKeys, key)
-		}
+	for key := range parent {
+		parentKeys = append(parentKeys, key)
 	}
 
 	if utils.StringArrayContainsString(objectKeys, "__typename") && utils.StringArrayContainsString(objectKeys, "id") {
 		typename := object["__typename"].(string)
 		id := object["id"].(string)
-		cacheKey := "gql:" + typename + ":" + id
+		cacheKey := "gql:" + queryPrefix + ":" + typename + ":" + id
 		gc.cacheStore.Set(cacheKey, object)
 
 		for key, value := range object {
@@ -317,7 +315,7 @@ func (gc *GraphCache) CacheObject(field string, object map[string]interface{}, p
 	} else if utils.StringArrayContainsString(objectKeys, "__typename") && !utils.StringArrayContainsString(objectKeys, "id") && parent != nil && utils.StringArrayContainsString(parentKeys, "id") && utils.StringArrayContainsString(parentKeys, "__typename") {
 		typename := parent["__typename"].(string)
 		parentID := parent["id"].(string)
-		cacheKey := "gql:" + typename + ":" + parentID + ":" + field
+		cacheKey := "gql:" + queryPrefix + ":" + typename + ":" + parentID + ":" + field
 		gc.cacheStore.Set(cacheKey, object)
 
 		for key, value := range object {
@@ -330,10 +328,10 @@ func (gc *GraphCache) CacheObject(field string, object map[string]interface{}, p
 	return ""
 }
 
-func (gc *GraphCache) CacheResponse(field string, object map[string]interface{}, parent map[string]interface{}) (interface{}, string) {
+func (gc *GraphCache) CacheResponse(queryPrefix string, field string, object map[string]interface{}, parent map[string]interface{}) (interface{}, string) {
 	for key, value := range object {
 		if nestedObj, ok := value.(map[string]interface{}); ok {
-			_, k := gc.CacheResponse(key, nestedObj, object)
+			_, k := gc.CacheResponse(queryPrefix, key, nestedObj, object)
 			if k != "" {
 				object[key] = k
 			}
@@ -341,7 +339,7 @@ func (gc *GraphCache) CacheResponse(field string, object map[string]interface{},
 		if objArray, ok := value.([]map[string]interface{}); ok {
 			responseObjects := make([]interface{}, 0)
 			for _, obj := range objArray {
-				_, k := gc.CacheResponse(key, obj, object)
+				_, k := gc.CacheResponse(queryPrefix, key, obj, object)
 				responseObjects = append(responseObjects, k)
 			}
 			if !utils.ArrayContains(responseObjects, "") {
@@ -352,8 +350,11 @@ func (gc *GraphCache) CacheResponse(field string, object map[string]interface{},
 			responseObjects := make([]interface{}, 0)
 			for _, obj := range objArray {
 				if objMap, ok := obj.(map[string]interface{}); ok {
-					_, k := gc.CacheResponse(key, objMap, object)
+					_, k := gc.CacheResponse(queryPrefix, key, objMap, object)
 					responseObjects = append(responseObjects, k)
+				}
+				if objMap, ok := obj.(string); ok {
+					responseObjects = append(responseObjects, objMap)
 				}
 			}
 			if !utils.ArrayContains(responseObjects, "") {
@@ -362,12 +363,12 @@ func (gc *GraphCache) CacheResponse(field string, object map[string]interface{},
 		}
 	}
 
-	cacheKey := gc.CacheObject(field, object, parent)
+	cacheKey := gc.CacheObject(queryPrefix, field, object, parent)
 
 	return object, cacheKey
 }
 
-func (gc *GraphCache) GetQueryResponseKey(queryDoc *ast.OperationDefinition, response map[string]interface{}, variables map[string]interface{}) map[string]interface{} {
+func (gc *GraphCache) GetQueryResponseKey(queryPrefix string, queryDoc *ast.OperationDefinition, response map[string]interface{}, variables map[string]interface{}) map[string]interface{} {
 	queryType := queryDoc.Operation
 	parentKey := queryDoc.Name
 
@@ -386,11 +387,11 @@ func (gc *GraphCache) GetQueryResponseKey(queryDoc *ast.OperationDefinition, res
 
 	responseData := response["data"].(map[string]interface{})
 
-	relationGraph["gql:"+string(queryType)+":"+parentKey+"("+gc.hashString(strings.Join(variableDefinitions, ","))+")"] = gc.GetResponseTypeID(queryDoc.SelectionSet, responseData)
+	relationGraph["gql:"+queryPrefix+":"+string(queryType)+":"+parentKey+"("+gc.hashString(strings.Join(variableDefinitions, ","))+")"] = gc.GetResponseTypeID(queryPrefix, queryDoc.SelectionSet, responseData)
 	return relationGraph
 }
 
-func (gc *GraphCache) GetResponseTypeID(selectionSet ast.SelectionSet, response map[string]interface{}) interface{} {
+func (gc *GraphCache) GetResponseTypeID(queryPrefix string, selectionSet ast.SelectionSet, response map[string]interface{}) interface{} {
 	updatedSelectionSet := ast.SelectionSet{}
 	// remove __typename field from the selection set
 	for _, selection := range selectionSet {
@@ -421,7 +422,7 @@ func (gc *GraphCache) GetResponseTypeID(selectionSet ast.SelectionSet, response 
 			if ok && selectionRespone != nil && selectionRespone["id"] != nil && selectionRespone["__typename"] != nil {
 				id := selectionRespone["id"].(string)
 				typeName := selectionRespone["__typename"].(string)
-				return map[string]interface{}{updatedSelectionSet[0].(*ast.Field).Name: "gql:" + typeName + ":" + id}
+				return map[string]interface{}{updatedSelectionSet[0].(*ast.Field).Name: "gql:" + queryPrefix + ":" + typeName + ":" + id}
 			}
 		case reflect.Slice:
 			selectionRespone, ok := response[selection.Name].([]interface{})
@@ -432,7 +433,7 @@ func (gc *GraphCache) GetResponseTypeID(selectionSet ast.SelectionSet, response 
 						if objMap["id"] != nil && objMap["__typename"] != nil {
 							id := objMap["id"].(string)
 							typeName := objMap["__typename"].(string)
-							responseObjects = append(responseObjects, "gql:"+typeName+":"+id)
+							responseObjects = append(responseObjects, "gql:"+queryPrefix+":"+typeName+":"+id)
 						}
 					}
 				}
@@ -526,17 +527,15 @@ func (gc *GraphCache) InvalidateCacheObject(field string, object map[string]inte
 
 	parentKeys := make([]string, 0)
 
-	if parent != nil {
-		for key := range parent {
-			parentKeys = append(parentKeys, key)
-		}
+	for key := range parent {
+		parentKeys = append(parentKeys, key)
 	}
 
 	if utils.StringArrayContainsString(objectKeys, "__typename") && utils.StringArrayContainsString(objectKeys, "id") {
 		typename := object["__typename"].(string)
 		id := object["id"].(string)
-		cacheKey := "gql:" + typename + ":" + id
-		gc.cacheStore.Del(cacheKey)
+		cacheKey := "gql:*:" + typename + ":" + id
+		gc.cacheStore.DeleteByPrefix(cacheKey)
 
 		for key := range object {
 			gc.recordCacheStore.Del(cacheKey + ":" + key)
@@ -546,8 +545,8 @@ func (gc *GraphCache) InvalidateCacheObject(field string, object map[string]inte
 	} else if utils.StringArrayContainsString(objectKeys, "__typename") && !utils.StringArrayContainsString(objectKeys, "id") && parent != nil && utils.StringArrayContainsString(parentKeys, "id") && utils.StringArrayContainsString(parentKeys, "__typename") {
 		typename := parent["__typename"].(string)
 		parentID := parent["id"].(string)
-		cacheKey := "gql:" + typename + ":" + parentID + ":" + field
-		gc.cacheStore.Del(cacheKey)
+		cacheKey := "gql:*:" + typename + ":" + parentID + ":" + field
+		gc.cacheStore.DeleteByPrefix(cacheKey)
 
 		for key := range object {
 			gc.recordCacheStore.Del(cacheKey + ":" + key)
@@ -585,7 +584,7 @@ func (gc *GraphCache) Flush() {
 }
 
 func (gc *GraphCache) FlushByType(typeName string, id string) {
-	gc.cacheStore.DeleteByPrefix("gql:" + typeName + ":" + id)
-	gc.recordCacheStore.DeleteByPrefix("gql:" + typeName + ":" + id)
-	gc.queryCacheStore.DeleteByPrefix("gql:" + typeName + ":" + id)
+	gc.cacheStore.DeleteByPrefix("gql:*" + typeName + ":" + id)
+	gc.recordCacheStore.DeleteByPrefix("gql:*" + typeName + ":" + id)
+	gc.queryCacheStore.DeleteByPrefix("gql:*" + typeName + ":" + id)
 }

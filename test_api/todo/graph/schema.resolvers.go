@@ -17,14 +17,15 @@ import (
 // CreateTodo is the resolver for the createTodo field.
 func (r *mutationResolver) CreateTodo(ctx context.Context, params model.NewTodoParams) (*db.Todo, error) {
 	todo := db.Todo{
-		ID:   uuid.New(),
-		Text: params.Text,
-		Done: false,
+		ID:     uuid.New(),
+		Text:   params.Text,
+		Done:   false,
+		UserID: uuid.MustParse(params.UserID),
 	}
 
-	r.DB.CreateTodo(&todo)
+	err := r.DB.CreateTodo(&todo)
 
-	return &todo, nil
+	return &todo, err
 }
 
 // UpdateTodo is the resolver for the updateTodo field.
@@ -197,6 +198,19 @@ func (r *todoResolver) UserID(ctx context.Context, obj *db.Todo) (string, error)
 	return obj.ID.String(), nil
 }
 
+// User is the resolver for the user field.
+func (r *todoResolver) User(ctx context.Context, obj *db.Todo) (*db.User, error) {
+	user := db.User{}
+	err := r.DB.GetUserByID(obj.UserID.String(), &user)
+	if err != nil {
+		return nil, err
+	}
+	if user.ID == uuid.Nil {
+		return nil, errors.New("user not found")
+	}
+	return &user, nil
+}
+
 // CreatedAt is the resolver for the createdAt field.
 func (r *todoResolver) CreatedAt(ctx context.Context, obj *db.Todo) (string, error) {
 	return obj.CreatedAt.Format(time.RFC3339), nil
@@ -228,6 +242,34 @@ func (r *userResolver) CreatedAt(ctx context.Context, obj *db.User) (string, err
 // UpdatedAt is the resolver for the updatedAt field.
 func (r *userResolver) UpdatedAt(ctx context.Context, obj *db.User) (string, error) {
 	return obj.UpdatedAt.Format(time.RFC3339), nil
+}
+
+// Meta is the resolver for the meta field.
+func (r *userResolver) Meta(ctx context.Context, obj *db.User) (*model.MetaInfo, error) {
+	createdAtUnix := int(obj.CreatedAt.Unix())
+
+	userAgent := ""
+	if ctx.Value("user-agent") != nil {
+		userAgent = ctx.Value("user-agent").(string)
+	}
+
+	ipAddress := ""
+	if ctx.Value("ip-address") != nil {
+		ipAddress = ctx.Value("ip-address").(string)
+	}
+
+	return &model.MetaInfo{
+		IPAddress:    &ipAddress,
+		UserAgent:    &userAgent,
+		CreatedEpoch: &createdAtUnix,
+	}, nil
+}
+
+// Tags is the resolver for the tags field.
+func (r *userResolver) Tags(ctx context.Context, obj *db.User) ([]string, error) {
+	tags := []string{"user", obj.CreatedAt.Month().String(), obj.CreatedAt.Weekday().String()}
+
+	return tags, nil
 }
 
 // Mutation returns MutationResolver implementation.
