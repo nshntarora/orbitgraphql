@@ -19,6 +19,10 @@ type Config struct {
 		DebugPath       string `toml:"debug_path"`
 		HealthPath      string `toml:"health_path"`
 	} `toml:"handlers"`
+	Redis struct {
+		Host string `toml:"host"`
+		Port int    `toml:"port"`
+	} `toml:"redis"`
 }
 
 const CONFIG_FILE = "./config.toml"
@@ -75,5 +79,6 @@ func NewConfig() *Config {
 		Port:         cfg.Port,
 		CacheBackend: cfg.CacheBackend,
 		Handlers:     cfg.Handlers,
+		Redis:        cfg.Redis,
 	}
 }

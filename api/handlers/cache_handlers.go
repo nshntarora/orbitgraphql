@@ -3,10 +3,10 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"graphql_cache/config"
 	"graphql_cache/graphcache"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
 	"time"
@@ -19,13 +19,13 @@ func GetCacheHandler(cache *graphcache.GraphCache, cfg *config.Config) http.Hand
 		// Create a new HTTP request with the same method, URL, and body as the original request
 		targetURL, err := url.Parse(cfg.Origin)
 		if err != nil {
-			log.Println(err)
+			fmt.Println(err)
 			http.Error(w, "Error parsing target URL", http.StatusInternalServerError)
 		}
 
 		proxyReq, err := http.NewRequest(r.Method, targetURL.String(), r.Body)
 		if err != nil {
-			log.Println(err)
+			fmt.Println(err)
 			http.Error(w, "Error creating proxy request", http.StatusInternalServerError)
 		}
 
@@ -38,7 +38,7 @@ func GetCacheHandler(cache *graphcache.GraphCache, cfg *config.Config) http.Hand
 
 		requestBody, err := io.ReadAll(proxyReq.Body)
 		if err != nil {
-			log.Println(err)
+			fmt.Println(err)
 			http.Error(w, "error reading request body", http.StatusInternalServerError)
 		}
 
@@ -49,17 +49,17 @@ func GetCacheHandler(cache *graphcache.GraphCache, cfg *config.Config) http.Hand
 
 		astQuery, err := graphcache.GetASTFromQuery(request.Query)
 		if err != nil {
-			log.Println(err)
+			fmt.Println(err)
 			http.Error(w, "error parsing query", http.StatusInternalServerError)
 		}
 
 		transformedBody, err := graphcache.AddTypenameToQuery(request.Query)
 		if err != nil {
-			log.Println(err)
+			fmt.Println(err)
 			http.Error(w, "error transforming body", http.StatusInternalServerError)
 		}
 
-		log.Println("time taken to transform body ", time.Since(start))
+		fmt.Println("time taken to transform body ", time.Since(start))
 
 		transformedRequest := request
 		transformedRequest.Query = transformedBody
@@ -89,30 +89,28 @@ func GetCacheHandler(cache *graphcache.GraphCache, cfg *config.Config) http.Hand
 			// Set the status code of the original response to the status code of the proxy response
 			w.WriteHeader(resp.StatusCode)
 
-			// Copy the body of the proxy response to the original response
-			io.Copy(w, resp.Body)
-
 			responseBody := new(bytes.Buffer)
 			io.Copy(responseBody, resp.Body)
 
 			responseMap := make(map[string]interface{})
 			err = json.Unmarshal(responseBody.Bytes(), &responseMap)
 			if err != nil {
-				log.Println("Error unmarshalling response:", err, string(responseBody.Bytes()))
+				fmt.Println("Error unmarshalling response:", string(responseBody.Bytes()))
 			}
 
 			cache.InvalidateCache("data", responseMap, nil)
+			w.Write(responseBody.Bytes())
 			return
 		}
 
 		cachedResponse, err := cache.ParseASTBuildResponse(astQuery, request)
 		if err == nil && cachedResponse != nil {
-			log.Println("serving response from cache...")
+			fmt.Println("serving response from cache...")
 			br, err := json.Marshal(cachedResponse)
 			if err != nil {
 				http.Error(w, "error marshalling response", http.StatusInternalServerError)
 			}
-			log.Println("time taken to serve response from cache ", time.Since(start))
+			fmt.Println("time taken to serve response from cache ", time.Since(start))
 			graphqlresponse := graphcache.GraphQLResponse{Data: json.RawMessage(br)}
 			res, err := cache.RemoveTypenameFromResponse(&graphqlresponse)
 			if err != nil {
@@ -130,15 +128,17 @@ func GetCacheHandler(cache *graphcache.GraphCache, cfg *config.Config) http.Hand
 		// Send the proxy request using the custom transport
 		resp, err := client.Do(proxyReq)
 		if err != nil {
-			log.Println(err)
+			fmt.Println(err)
 			http.Error(w, "error sending proxy request", http.StatusInternalServerError)
 		}
 		defer resp.Body.Close()
 
-		// Copy the headers from the proxy response to the original response
+		// copy the headers from the proxy response to the original response
 		for name, values := range resp.Header {
-			for _, value := range values {
-				w.Header().Add(name, value)
+			if name != "Content-Length" { // copy all headers except Content-Length
+				for _, value := range values {
+					w.Header().Add(name, value)
+				}
 			}
 		}
 
@@ -148,18 +148,18 @@ func GetCacheHandler(cache *graphcache.GraphCache, cfg *config.Config) http.Hand
 		responseMap := make(map[string]interface{})
 		err = json.Unmarshal(responseBody.Bytes(), &responseMap)
 		if err != nil {
-			log.Println("Error unmarshalling response:", err, string(responseBody.Bytes()))
+			fmt.Println("Error unmarshalling response:", string(responseBody.Bytes()))
 		}
 
-		log.Println("time taken to get response from API ", time.Since(start))
+		fmt.Println("time taken to get response from API ", time.Since(start))
 
 		astWithTypes, err := graphcache.GetASTFromQuery(transformedRequest.Query)
 		if err != nil {
-			log.Println(err)
+			fmt.Println(err)
 			http.Error(w, "error parsing query", http.StatusInternalServerError)
 		}
 
-		log.Println("time taken to generate AST with types ", time.Since(start))
+		fmt.Println("time taken to generate AST with types ", time.Since(start))
 
 		reqVariables := transformedRequest.Variables
 		variables := make(map[string]interface{})
@@ -177,7 +177,7 @@ func GetCacheHandler(cache *graphcache.GraphCache, cfg *config.Config) http.Hand
 			}
 		}
 
-		log.Println("time taken to build response key ", time.Since(start))
+		fmt.Println("time taken to build response key ", time.Since(start))
 
 		// go through the response. Every object that has a __typename field, and an id field cache it in the format of typename:id
 		// for example, if the response has an object with __typename: "Organisation" and id: "1234", cache it as Organisation:1234
@@ -186,23 +186,15 @@ func GetCacheHandler(cache *graphcache.GraphCache, cfg *config.Config) http.Hand
 
 		cache.CacheResponse("data", responseMap, nil)
 
-		log.Println("time taken to cache response ", time.Since(start))
-
-		// Copy the body of the proxy response to the original response
-		// io.Copy(w, resp.Body)
-
-		resBody, err := io.ReadAll(resp.Body)
-		if err != nil {
-			http.Error(w, "error reading response body", http.StatusInternalServerError)
-		}
+		fmt.Println("time taken to cache response ", time.Since(start), responseMap)
 
 		newResponse := &graphcache.GraphQLResponse{}
-		newResponse.FromBytes(resBody)
+		newResponse.FromBytes(responseBody.Bytes())
 		res, err := cache.RemoveTypenameFromResponse(newResponse)
 		if err != nil {
 			http.Error(w, "error removing __typename", http.StatusInternalServerError)
 		}
 		w.Write(res.Bytes())
-		// w.WriteHeader(http.StatusOK)
+		w.Header().Add("graphql_cache", "miss")
 	})
 }

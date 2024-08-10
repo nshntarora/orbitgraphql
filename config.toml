@@ -3,7 +3,7 @@
 # If your cache is running on https://api.acme.com/api/graphql then you should set the following:
 # origin="https://api.acme.com/api/graphql"
 
-origin="http://localhost:8080"
+origin="http://localhost:8080/graphql"
 
 
 # Next, we need to configure the port that our cache will run on.
@@ -17,7 +17,11 @@ port=9090
 # redis
 # in_memory
 
-cache_backend="redis"
+cache_backend="in_memory"
+
+[redis]
+host="localhost"
+port=6379
 
 
 # If you want to override the API paths for the cache server, you can configure them here.

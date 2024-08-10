@@ -15,9 +15,9 @@ type RedisCache struct {
 	cache *redis.Client
 }
 
-func NewRedisCache() Cache {
+func NewRedisCache(host, port string) Cache {
 	c := redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379",
+		Addr:     host + ":" + port,
 		Password: "", // no password set
 		DB:       0,  // use default DB
 	})

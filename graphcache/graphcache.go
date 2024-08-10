@@ -3,10 +3,13 @@ package graphcache
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"graphql_cache/cache"
+	"graphql_cache/config"
 	"graphql_cache/utils"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/vektah/gqlparser/ast"
@@ -19,12 +22,12 @@ type GraphCache struct {
 	queryCacheStore  cache.Cache
 }
 
-func NewGraphCache(backend string) *GraphCache {
-	if backend == "redis" {
+func NewGraphCache(cfg *config.Config) *GraphCache {
+	if cfg.CacheBackend == "redis" {
 		return &GraphCache{
-			cacheStore:       cache.NewRedisCache(),
-			recordCacheStore: cache.NewRedisCache(),
-			queryCacheStore:  cache.NewRedisCache(),
+			cacheStore:       cache.NewRedisCache(cfg.Redis.Host, strconv.Itoa(cfg.Redis.Port)),
+			recordCacheStore: cache.NewRedisCache(cfg.Redis.Host, strconv.Itoa(cfg.Redis.Port)),
+			queryCacheStore:  cache.NewRedisCache(cfg.Redis.Host, strconv.Itoa(cfg.Redis.Port)),
 		}
 	}
 	return &GraphCache{
@@ -125,7 +128,7 @@ func (gc *GraphCache) ParseASTBuildResponse(astQuery *ast.QueryDocument, request
 		switch responseType := cachedResponse.(type) {
 		case string:
 			res, err := gc.TraverseResponseFromKey(responseType)
-			if err != nil {
+			if err != nil || res == nil {
 				fmt.Println("Error traversing response from key:", err)
 				return nil, err
 			}
@@ -136,7 +139,7 @@ func (gc *GraphCache) ParseASTBuildResponse(astQuery *ast.QueryDocument, request
 				if val, ok := value.(string); ok {
 					if strings.HasPrefix(val, "gql:") {
 						nestedResponse, err := gc.TraverseResponseFromKey(val)
-						if err != nil {
+						if err != nil || nestedResponse == nil {
 							fmt.Println("Error traversing nested response from key:", val, " ", err)
 							return nil, err
 						}
@@ -148,7 +151,7 @@ func (gc *GraphCache) ParseASTBuildResponse(astQuery *ast.QueryDocument, request
 						if v, ok := v.(string); ok {
 							if strings.HasPrefix(v, "gql:") {
 								nestedResponse, err := gc.TraverseResponseFromKey(v)
-								if err != nil {
+								if err != nil || nestedResponse == nil {
 									fmt.Println("Error traversing nested response from key:", v, " ", err)
 									return nil, err
 								}
@@ -163,7 +166,7 @@ func (gc *GraphCache) ParseASTBuildResponse(astQuery *ast.QueryDocument, request
 						if v, ok := v.(string); ok {
 							if strings.HasPrefix(v, "gql:") {
 								nestedResponse, err := gc.TraverseResponseFromKey(v)
-								if err != nil {
+								if err != nil || nestedResponse == nil {
 									fmt.Println("Error traversing nested response from key:", v, " ", err)
 									return nil, err
 								}
@@ -180,7 +183,7 @@ func (gc *GraphCache) ParseASTBuildResponse(astQuery *ast.QueryDocument, request
 							if v, ok := v.(string); ok {
 								if strings.HasPrefix(v, "gql:") {
 									nestedResponse, err := gc.TraverseResponseFromKey(v)
-									if err != nil {
+									if err != nil || nestedResponse == nil {
 										fmt.Println("Error traversing nested response from key:", v, " ", err)
 										return nil, err
 									}
@@ -199,7 +202,7 @@ func (gc *GraphCache) ParseASTBuildResponse(astQuery *ast.QueryDocument, request
 				if val, ok := v.(string); ok {
 					if strings.HasPrefix(val, "gql:") {
 						nestedResponse, err := gc.TraverseResponseFromKey(val)
-						if err != nil {
+						if err != nil || nestedResponse == nil {
 							fmt.Println("Error traversing nested response from key:", val, " ", err)
 							return nil, err
 						}
@@ -210,7 +213,7 @@ func (gc *GraphCache) ParseASTBuildResponse(astQuery *ast.QueryDocument, request
 						if val, ok := value.(string); ok {
 							if strings.HasPrefix(val, "gql:") {
 								nestedResponse, err := gc.TraverseResponseFromKey(val)
-								if err != nil {
+								if err != nil || nestedResponse == nil {
 									fmt.Println("Error traversing nested response from key:", val, " ", err)
 									return nil, err
 								}
@@ -224,7 +227,7 @@ func (gc *GraphCache) ParseASTBuildResponse(astQuery *ast.QueryDocument, request
 			return nil, nil
 		}
 	}
-	return nil, nil
+	return nil, errors.New("error getting response from cache")
 }
 
 func (gc *GraphCache) TraverseResponseFromKey(response interface{}) (interface{}, error) {
@@ -279,7 +282,7 @@ func (gc *GraphCache) TraverseResponseFromKey(response interface{}) (interface{}
 		return responseMap, nil
 	}
 
-	return nil, nil
+	return nil, errors.New("error traversing response from key")
 }
 
 func (gc *GraphCache) CacheObject(field string, object map[string]interface{}, parent map[string]interface{}) string {
@@ -376,6 +379,10 @@ func (gc *GraphCache) GetQueryResponseKey(queryDoc *ast.OperationDefinition, res
 	}
 
 	relationGraph := make(map[string]interface{})
+
+	if response == nil || response["data"] == nil {
+		return relationGraph
+	}
 
 	responseData := response["data"].(map[string]interface{})
 
@@ -556,6 +563,19 @@ func (gc *GraphCache) Debug() {
 	gc.cacheStore.Debug("cacheStore")
 	gc.recordCacheStore.Debug("recordCacheStore")
 	gc.queryCacheStore.Debug("queryCacheStore")
+}
+
+func (gc *GraphCache) Look() map[string]interface{} {
+	output := make(map[string]interface{})
+	cacheMap, _ := gc.cacheStore.Map()
+	recordCacheMap, _ := gc.recordCacheStore.Map()
+	queryCacheMap, _ := gc.queryCacheStore.Map()
+
+	output["cacheStore"] = cacheMap
+	output["recordCacheStore"] = recordCacheMap
+	output["queryCacheStore"] = queryCacheMap
+
+	return output
 }
 
 func (gc *GraphCache) Flush() {

@@ -15,7 +15,7 @@ type Server struct {
 }
 
 func NewGraphCache(cfg *config.Config) *graphcache.GraphCache {
-	return graphcache.NewGraphCache(cfg.CacheBackend)
+	return graphcache.NewGraphCache(cfg)
 }
 
 func NewServer(cfg *config.Config) *Server {

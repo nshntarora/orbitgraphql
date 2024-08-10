@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"graphql_cache/test_api/todo/db"
+	"io"
 	"net/http"
 	"time"
 
@@ -44,8 +45,14 @@ func (c *GraphQLClient) MakeRequest(query string, variables map[string]interface
 	}
 	defer resp.Body.Close()
 
+	res, err := io.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Println("received error in reading response ", err, query)
+		return nil, time.Since(start), err
+	}
+
 	var response GraphQLResponse
-	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+	if err := json.Unmarshal(res, &response); err != nil {
 		return nil, time.Since(start), err
 	}
 

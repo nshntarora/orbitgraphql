@@ -2,45 +2,54 @@ package cache
 
 import (
 	"encoding/json"
+	"errors"
 	"graphql_cache/utils/file_utils"
+	"strings"
 )
 
-// InMemoryCache implements the Cache interface and uses an in-memory map as the cache store
 type InMemoryCache struct {
-	cache map[string]interface{}
+	data map[string]interface{}
 }
 
 func NewInMemoryCache() *InMemoryCache {
 	return &InMemoryCache{
-		cache: make(map[string]interface{}),
+		data: make(map[string]interface{}),
 	}
 }
 
 func (c *InMemoryCache) Set(key string, value interface{}) error {
-	c.cache[key] = value
+	c.data[key] = deepCopy(value)
 	return nil
 }
 
 func (c *InMemoryCache) Get(key string) (interface{}, error) {
-	return c.cache[key], nil
+	value, exists := c.data[key]
+	if !exists {
+		return nil, errors.New("key not found")
+	}
+	return deepCopy(value), nil
 }
 
 func (c *InMemoryCache) Del(key string) error {
-	delete(c.cache, key)
+	c.Set(key, nil)
 	return nil
 }
 
 func (c *InMemoryCache) Exists(key string) (bool, error) {
-	_, exists := c.cache[key]
+	_, exists := c.data[key]
 	return exists, nil
 }
 
 func (c *InMemoryCache) Map() (map[string]interface{}, error) {
-	return c.cache, nil
+	copy := make(map[string]interface{})
+	for k, v := range c.data {
+		copy[k] = v
+	}
+	return copy, nil
 }
 
 func (c *InMemoryCache) JSON() ([]byte, error) {
-	return json.Marshal(c.cache)
+	return json.Marshal(c.data)
 }
 
 func (c *InMemoryCache) Debug(identifier string) error {
@@ -52,15 +61,38 @@ func (c *InMemoryCache) Debug(identifier string) error {
 }
 
 func (c *InMemoryCache) Flush() error {
-	c.cache = make(map[string]interface{})
+	c.data = make(map[string]interface{})
 	return nil
 }
 
 func (c *InMemoryCache) DeleteByPrefix(prefix string) error {
-	for key := range c.cache {
-		if len(key) >= len(prefix) && key[:len(prefix)] == prefix {
-			delete(c.cache, key)
+	for k := range c.data {
+		if strings.HasPrefix(k, prefix) {
+			c.Del(k)
 		}
 	}
 	return nil
+}
+
+func deepCopy(v interface{}) interface{} {
+	if v == nil {
+		return nil
+	}
+
+	switch val := v.(type) {
+	case map[string]interface{}:
+		newMap := make(map[string]interface{})
+		for k, v := range val {
+			newMap[k] = deepCopy(v)
+		}
+		return newMap
+	case []interface{}:
+		newSlice := make([]interface{}, len(val))
+		for i, v := range val {
+			newSlice[i] = deepCopy(v)
+		}
+		return newSlice
+	default:
+		return v
+	}
 }
