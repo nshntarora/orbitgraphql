@@ -6,11 +6,14 @@ package graph
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"graphql_cache/test_api/todo/db"
 	"graphql_cache/test_api/todo/graph/model"
+	"io"
 	"time"
 
+	"github.com/99designs/gqlgen/graphql"
 	"github.com/google/uuid"
 )
 
@@ -132,6 +135,24 @@ func (r *mutationResolver) DeleteEverything(ctx context.Context) (bool, error) {
 		return false, err
 	}
 	return true, nil
+}
+
+// UploadImage is the resolver for the uploadImage field.
+func (r *mutationResolver) UploadImage(ctx context.Context, file graphql.Upload) (*model.ImageUploadResponse, error) {
+	// get the file upload and return a base64 url of the image
+
+	fileBytes, err := io.ReadAll(file.File)
+	if err != nil {
+		return nil, err
+	}
+
+	// convert fileBytes to base64 string
+	base64string := base64.StdEncoding.EncodeToString(fileBytes)
+
+	return &model.ImageUploadResponse{
+		Base64:   base64string,
+		MimeType: file.ContentType,
+	}, nil
 }
 
 // AllTodos is the resolver for the allTodos field.

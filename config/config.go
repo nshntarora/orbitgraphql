@@ -23,6 +23,7 @@ type Config struct {
 		Host string `toml:"host"`
 		Port int    `toml:"port"`
 	} `toml:"redis"`
+	CacheHeaderName string `toml:"cache_header_name"`
 }
 
 const CONFIG_FILE = "./config.toml"
@@ -74,11 +75,9 @@ func NewConfig() *Config {
 		cfg.Handlers.HealthPath = "/health"
 	}
 
-	return &Config{
-		Origin:       cfg.Origin,
-		Port:         cfg.Port,
-		CacheBackend: cfg.CacheBackend,
-		Handlers:     cfg.Handlers,
-		Redis:        cfg.Redis,
+	if cfg.CacheHeaderName == "" {
+		cfg.CacheHeaderName = "x-orbit-cache"
 	}
+
+	return &cfg
 }

@@ -13,8 +13,13 @@ import (
 	"time"
 )
 
+const CACHE_STATUS_BYPASS = "BYPASS"
+const CACHE_STATUS_HIT = "HIT"
+const CACHE_STATUS_MISS = "MISS"
+
 func GetCacheHandler(cache *graphcache.GraphCache, cfg *config.Config) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
 		w.Header().Add("Content-Type", "application/json")
 
 		// Create a new HTTP request with the same method, URL, and body as the original request
@@ -24,17 +29,34 @@ func GetCacheHandler(cache *graphcache.GraphCache, cfg *config.Config) http.Hand
 			http.Error(w, "Error parsing target URL", http.StatusInternalServerError)
 		}
 
-		proxyReq, err := http.NewRequest(r.Method, targetURL.String(), r.Body)
-		if err != nil {
-			fmt.Println(err)
-			http.Error(w, "Error creating proxy request", http.StatusInternalServerError)
+		// only handle if the request is of content type application/json
+		// for all other content types, pass the request to the origin server
+		if r.Header.Get("Content-Type") != "application/json" {
+			proxyReq, err := CopyRequest(r, cfg.Origin)
+			if err != nil {
+				fmt.Println(err)
+				http.Error(w, "Error copying request", http.StatusInternalServerError)
+			}
+
+			resp, err := SendRequest(proxyReq, w, map[string]interface{}{
+				cfg.CacheHeaderName: CACHE_STATUS_BYPASS,
+			})
+			if err != nil {
+				fmt.Println(err)
+				http.Error(w, "error sending proxy request", http.StatusInternalServerError)
+			}
+			defer resp.Body.Close()
+
+			responseBody := new(bytes.Buffer)
+			io.Copy(responseBody, resp.Body)
+			w.Write(responseBody.Bytes())
+			return
 		}
 
-		// Copy the headers from the original request to the proxy request
-		for name, values := range r.Header {
-			for _, value := range values {
-				proxyReq.Header.Add(name, value)
-			}
+		proxyReq, err := CopyRequest(r, targetURL.String())
+		if err != nil {
+			fmt.Println(err)
+			http.Error(w, "Error copying request", http.StatusInternalServerError)
 		}
 
 		requestBody, err := io.ReadAll(proxyReq.Body)
@@ -78,26 +100,14 @@ func GetCacheHandler(cache *graphcache.GraphCache, cfg *config.Config) http.Hand
 			proxyReq.Body = io.NopCloser(bytes.NewBuffer(transformedRequest.Bytes()))
 			proxyReq.ContentLength = -1
 
-			client := http.Client{}
-			// Send the proxy request using the custom transport
-			resp, err := client.Do(proxyReq)
-			if err != nil || resp == nil {
-				http.Error(w, "Error sending proxy request", http.StatusInternalServerError)
-
+			resp, err := SendRequest(proxyReq, w, map[string]interface{}{
+				cfg.CacheHeaderName: CACHE_STATUS_BYPASS,
+			})
+			if err != nil {
+				fmt.Println(err)
+				http.Error(w, "error sending proxy request", http.StatusInternalServerError)
 			}
 			defer resp.Body.Close()
-
-			// Copy the headers from the proxy response to the original response
-			for name, values := range resp.Header {
-				if name != "Content-Length" {
-					for _, value := range values {
-						w.Header().Add(name, value)
-					}
-				}
-			}
-
-			// Set the status code of the original response to the status code of the proxy response
-			w.WriteHeader(resp.StatusCode)
 
 			responseBody := new(bytes.Buffer)
 			io.Copy(responseBody, resp.Body)
@@ -116,6 +126,7 @@ func GetCacheHandler(cache *graphcache.GraphCache, cfg *config.Config) http.Hand
 			if err != nil {
 				http.Error(w, "error removing __typename", http.StatusInternalServerError)
 			}
+
 			w.Write(res.Bytes())
 			return
 		}
@@ -133,6 +144,7 @@ func GetCacheHandler(cache *graphcache.GraphCache, cfg *config.Config) http.Hand
 			if err != nil {
 				http.Error(w, "error removing __typename", http.StatusInternalServerError)
 			}
+			w.Header().Add(cfg.CacheHeaderName, CACHE_STATUS_HIT)
 			w.Write(res.Bytes())
 			return
 		}
@@ -140,24 +152,14 @@ func GetCacheHandler(cache *graphcache.GraphCache, cfg *config.Config) http.Hand
 		proxyReq.Body = io.NopCloser(bytes.NewBuffer(transformedRequest.Bytes()))
 		proxyReq.ContentLength = -1
 
-		client := http.Client{}
-
-		// Send the proxy request using the custom transport
-		resp, err := client.Do(proxyReq)
+		resp, err := SendRequest(proxyReq, w, map[string]interface{}{
+			cfg.CacheHeaderName: CACHE_STATUS_MISS,
+		})
 		if err != nil {
 			fmt.Println(err)
 			http.Error(w, "error sending proxy request", http.StatusInternalServerError)
 		}
 		defer resp.Body.Close()
-
-		// copy the headers from the proxy response to the original response
-		for name, values := range resp.Header {
-			if name != "Content-Length" { // copy all headers except Content-Length
-				for _, value := range values {
-					w.Header().Add(name, value)
-				}
-			}
-		}
 
 		responseBody := new(bytes.Buffer)
 		io.Copy(responseBody, resp.Body)
@@ -211,7 +213,54 @@ func GetCacheHandler(cache *graphcache.GraphCache, cfg *config.Config) http.Hand
 		if err != nil {
 			http.Error(w, "error removing __typename", http.StatusInternalServerError)
 		}
+
 		w.Write(res.Bytes())
-		w.Header().Add("graphql_cache", "miss")
 	})
+}
+
+func CopyRequest(r *http.Request, targetURL string) (*http.Request, error) {
+	proxyReq, err := http.NewRequest(r.Method, targetURL, r.Body)
+	if err != nil {
+		fmt.Println(err)
+		// http.Error(w, "Error creating proxy request", http.StatusInternalServerError)
+		return nil, err
+	}
+
+	// Copy the headers from the original request to the proxy request
+	for name, values := range r.Header {
+		for _, value := range values {
+			proxyReq.Header.Add(name, value)
+		}
+	}
+
+	proxyReq.ContentLength = -1
+
+	return proxyReq, nil
+}
+
+func SendRequest(proxyReq *http.Request, w http.ResponseWriter, headers map[string]interface{}) (*http.Response, error) {
+	client := http.Client{}
+	// Send the proxy request using the custom transport
+	resp, err := client.Do(proxyReq)
+	if err != nil || resp == nil {
+		http.Error(w, "Error sending proxy request", http.StatusInternalServerError)
+		return resp, err
+	}
+
+	// Copy the headers from the proxy response to the original response
+	for name, values := range resp.Header {
+		if name != "Content-Length" {
+			for _, value := range values {
+				w.Header().Add(name, value)
+			}
+		}
+	}
+
+	for key, value := range headers {
+		w.Header().Add(key, fmt.Sprintf("%v", value))
+	}
+
+	w.WriteHeader(resp.StatusCode)
+
+	return resp, nil
 }

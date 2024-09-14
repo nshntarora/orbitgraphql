@@ -1,4 +1,5 @@
 scalar Map
+scalar Upload
 
 directive @goField(
   forceResolver: Boolean
@@ -70,4 +71,10 @@ type Mutation {
   deleteUser(id: String!): User!
   updateUser(id: String!, name: String, email: String, username: String): User!
   deleteEverything: Boolean!
+  uploadImage(file: Upload!): ImageUploadResponse!
+}
+
+type ImageUploadResponse {
+  base64: String!
+  mimeType: String!
 }

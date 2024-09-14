@@ -263,3 +263,14 @@ func TestWithTodoOperations(t *testing.T) {
 	assert.NotNil(t, todoResponse.User)
 	assert.Equal(t, userID, todoResponse.User.ID.String())
 }
+
+func TestMultipartRequestsBypass(t *testing.T) {
+	client := test_client.NewGraphQLClient("http://localhost:9090/graphql", "http://localhost:9090")
+
+	resp, headers, _, err := client.UploadImage("./logo.svg")
+	assert.Nil(t, err)
+	assert.NotNil(t, resp)
+	assert.NotNil(t, headers)
+
+	assert.Equal(t, "BYPASS", headers["X-Orbit-Cache"])
+}

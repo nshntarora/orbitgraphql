@@ -6,7 +6,10 @@ import (
 	"fmt"
 	"graphql_cache/test_api/todo/db"
 	"io"
+	"mime/multipart"
 	"net/http"
+	"os"
+	"path/filepath"
 	"time"
 
 	"golang.org/x/exp/rand"
@@ -31,7 +34,40 @@ type GraphQLResponse struct {
 	Errors []interface{}   `json:"errors"`
 }
 
-func (c *GraphQLClient) MakeRequest(query string, variables map[string]interface{}) (json.RawMessage, time.Duration, error) {
+func (c *GraphQLClient) MakeRequest(buf *bytes.Buffer, contentType string) (json.RawMessage, map[string]interface{}, time.Duration, error) {
+	start := time.Now()
+
+	responseHeaders := make(map[string]interface{})
+
+	resp, err := http.Post(c.graphqlURL, contentType, buf)
+	if err != nil {
+		return nil, responseHeaders, time.Since(start), err
+	}
+	defer resp.Body.Close()
+
+	for k := range resp.Header {
+		responseHeaders[k] = resp.Header.Get(k)
+	}
+
+	res, err := io.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Println("received error in reading response ", err, resp.ContentLength)
+		return nil, responseHeaders, time.Since(start), err
+	}
+
+	var response GraphQLResponse
+	if err := json.Unmarshal(res, &response); err != nil {
+		return nil, responseHeaders, time.Since(start), err
+	}
+
+	if len(response.Errors) > 0 {
+		return nil, responseHeaders, time.Since(start), fmt.Errorf("graphql errors: %v", response.Errors)
+	}
+
+	return response.Data, responseHeaders, time.Since(start), nil
+}
+
+func (c *GraphQLClient) MakeJSONRequest(query string, variables map[string]interface{}) (json.RawMessage, time.Duration, error) {
 	start := time.Now()
 	requestBody, err := json.Marshal(GraphQLRequest{Query: query, Variables: variables})
 
@@ -39,28 +75,8 @@ func (c *GraphQLClient) MakeRequest(query string, variables map[string]interface
 		return nil, time.Since(start), err
 	}
 
-	resp, err := http.Post(c.graphqlURL, "application/json", bytes.NewBuffer(requestBody))
-	if err != nil {
-		return nil, time.Since(start), err
-	}
-	defer resp.Body.Close()
-
-	res, err := io.ReadAll(resp.Body)
-	if err != nil {
-		fmt.Println("received error in reading response ", err, query, resp.ContentLength)
-		return nil, time.Since(start), err
-	}
-
-	var response GraphQLResponse
-	if err := json.Unmarshal(res, &response); err != nil {
-		return nil, time.Since(start), err
-	}
-
-	if len(response.Errors) > 0 {
-		return nil, time.Since(start), fmt.Errorf("graphql errors: %v", response.Errors)
-	}
-
-	return response.Data, time.Since(start), nil
+	res, _, tt, err := c.MakeRequest(bytes.NewBuffer(requestBody), "application/json")
+	return res, tt, err
 }
 
 func (c *GraphQLClient) FlushCache() error {
@@ -124,7 +140,7 @@ func (c *GraphQLClient) CreateRandomUser() (*db.User, time.Duration, error) {
 		"username": fmt.Sprintf("user%d", rand.Intn(1000)),
 	}
 
-	data, time, err := c.MakeRequest(query, variables)
+	data, time, err := c.MakeJSONRequest(query, variables)
 	if err != nil {
 		return nil, time, err
 	}
@@ -169,7 +185,7 @@ func (c *GraphQLClient) UpdateUser(id, name, email, username string) (*db.User, 
 		"email":    email,
 	}
 
-	data, time, err := c.MakeRequest(query, variables)
+	data, time, err := c.MakeJSONRequest(query, variables)
 	if err != nil {
 		return nil, time, err
 	}
@@ -211,7 +227,7 @@ func (c *GraphQLClient) DeleteUser(userId string) (*db.User, time.Duration, erro
 		"id": userId,
 	}
 
-	data, time, err := c.MakeRequest(query, variables)
+	data, time, err := c.MakeJSONRequest(query, variables)
 	if err != nil {
 		return nil, time, err
 	}
@@ -259,7 +275,7 @@ func (c *GraphQLClient) CreateRandomTodo(userId string) (*db.Todo, time.Duration
 		"userId": userId, // Replace with actual user ID
 	}
 
-	data, time, err := c.MakeRequest(query, variables)
+	data, time, err := c.MakeJSONRequest(query, variables)
 	if err != nil {
 		return nil, time, err
 	}
@@ -305,7 +321,7 @@ func (c *GraphQLClient) MarkTodoAsDone(todoId string) (*db.Todo, time.Duration, 
 		"id": todoId, // Replace with actual user ID
 	}
 
-	data, time, err := c.MakeRequest(query, variables)
+	data, time, err := c.MakeJSONRequest(query, variables)
 	if err != nil {
 		return nil, time, err
 	}
@@ -351,7 +367,7 @@ func (c *GraphQLClient) MarkTodoAsUnDone(todoId string) (*db.Todo, time.Duration
 		"id": todoId, // Replace with actual user ID
 	}
 
-	data, time, err := c.MakeRequest(query, variables)
+	data, time, err := c.MakeJSONRequest(query, variables)
 	if err != nil {
 		return nil, time, err
 	}
@@ -397,7 +413,7 @@ func (c *GraphQLClient) DeleteTodo(todoId string) (*db.Todo, time.Duration, erro
 		"id": todoId, // Replace with actual user ID
 	}
 
-	data, time, err := c.MakeRequest(query, variables)
+	data, time, err := c.MakeJSONRequest(query, variables)
 	if err != nil {
 		return nil, time, err
 	}
@@ -441,7 +457,7 @@ func (c *GraphQLClient) PaginateUsers() ([]db.User, time.Duration, error) {
 		"perPage": 100,
 	}
 
-	data, time, err := c.MakeRequest(query, variables)
+	data, time, err := c.MakeJSONRequest(query, variables)
 	if err != nil {
 		return nil, time, err
 	}
@@ -477,7 +493,7 @@ func (c *GraphQLClient) PaginateTodos() ([]db.Todo, time.Duration, error) {
 		"perPage": 100,
 	}
 
-	data, time, err := c.MakeRequest(query, variables)
+	data, time, err := c.MakeJSONRequest(query, variables)
 	if err != nil {
 		return nil, time, err
 	}
@@ -519,7 +535,7 @@ func (c *GraphQLClient) GetUserByID(userID string) (*db.User, time.Duration, err
 		"id": userID,
 	}
 
-	data, time, err := c.MakeRequest(query, variables)
+	data, time, err := c.MakeJSONRequest(query, variables)
 	if err != nil {
 		return nil, time, err
 	}
@@ -564,7 +580,7 @@ func (c *GraphQLClient) GetUserTodosByID(userID string) (*db.User, time.Duration
 		"id": userID,
 	}
 
-	data, time, err := c.MakeRequest(query, variables)
+	data, time, err := c.MakeJSONRequest(query, variables)
 	if err != nil {
 		return nil, time, err
 	}
@@ -596,7 +612,7 @@ func (c *GraphQLClient) GetTodoByID(todoID string) (*db.Todo, time.Duration, err
 		"id": todoID,
 	}
 
-	data, time, err := c.MakeRequest(query, variables)
+	data, time, err := c.MakeJSONRequest(query, variables)
 	if err != nil {
 		return nil, time, err
 	}
@@ -632,7 +648,7 @@ func (c *GraphQLClient) GetTodoByIDWithUser(todoID string) (*db.Todo, time.Durat
 		"id": todoID,
 	}
 
-	data, time, err := c.MakeRequest(query, variables)
+	data, time, err := c.MakeJSONRequest(query, variables)
 	if err != nil {
 		return nil, time, err
 	}
@@ -662,7 +678,7 @@ func (c *GraphQLClient) GetSystemDetails() (map[string]interface{}, time.Duratio
     `
 	variables := map[string]interface{}{}
 
-	data, time, err := c.MakeRequest(query, variables)
+	data, time, err := c.MakeJSONRequest(query, variables)
 	if err != nil {
 		return nil, time, err
 	}
@@ -685,7 +701,7 @@ func (c *GraphQLClient) DeleteEverything() (bool, time.Duration, error) {
 	  `
 	variables := map[string]interface{}{}
 
-	data, time, err := c.MakeRequest(query, variables)
+	data, time, err := c.MakeJSONRequest(query, variables)
 	if err != nil {
 		return false, time, err
 	}
@@ -698,4 +714,46 @@ func (c *GraphQLClient) DeleteEverything() (bool, time.Duration, error) {
 	}
 
 	return result.DeleteEverything, time, nil
+}
+
+func (c *GraphQLClient) UploadImage(filePath string) (map[string]interface{}, map[string]interface{}, time.Duration, error) {
+	startTime := time.Now()
+
+	payload := &bytes.Buffer{}
+	writer := multipart.NewWriter(payload)
+	_ = writer.WriteField("operations", "{ \"query\": \"mutation ($file: Upload!) { uploadImage(file: $file) { base64 mimeType } }\", \"variables\": { \"file\": null } }")
+	_ = writer.WriteField("map", "{ \"0\": [\"variables.file\"] }")
+	file, err := os.Open(filePath)
+	if err != nil {
+		fmt.Println(err)
+		return nil, nil, time.Since(startTime), err
+	}
+	defer file.Close()
+	part3, err := writer.CreateFormFile("0", filepath.Base(filePath))
+	if err != nil {
+		fmt.Println(err)
+		return nil, nil, time.Since(startTime), err
+	}
+	_, err = io.Copy(part3, file)
+	if err != nil {
+		fmt.Println(err)
+		return nil, nil, time.Since(startTime), err
+	}
+	err = writer.Close()
+	if err != nil {
+		fmt.Println(err)
+		return nil, nil, time.Since(startTime), err
+	}
+
+	res, headers, tt, err := c.MakeRequest(payload, writer.FormDataContentType())
+	if err != nil {
+		return nil, headers, tt, err
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(res, &result); err != nil {
+		return nil, headers, tt, err
+	}
+
+	return result, headers, tt, nil
 }

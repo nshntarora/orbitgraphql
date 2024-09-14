@@ -103,6 +103,10 @@ func (gc *GraphCache) deleteTypename(data interface{}) interface{} {
 
 func (gc *GraphCache) ParseASTBuildResponse(queryPrefix string, astQuery *ast.QueryDocument, requestBody GraphQLRequest) (interface{}, error) {
 
+	if len(astQuery.Operations) == 0 {
+		return nil, errors.New("no operations found in query")
+	}
+
 	queryDoc := astQuery.Operations[0]
 
 	reqVariables := requestBody.Variables

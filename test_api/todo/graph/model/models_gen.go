@@ -2,6 +2,11 @@
 
 package model
 
+type ImageUploadResponse struct {
+	Base64   string `json:"base64"`
+	MimeType string `json:"mimeType"`
+}
+
 type MetaInfo struct {
 	IPAddress    *string `json:"ipAddress,omitempty"`
 	UserAgent    *string `json:"userAgent,omitempty"`
