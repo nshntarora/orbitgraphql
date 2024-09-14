@@ -46,6 +46,13 @@ type Query {
   users(query: String, page: Int, perPage: Int): [User!]!
   user(id: String!): User
   todo(id: String!): Todo
+  healthy: Boolean!
+  totalTodos: Int!
+  activityStreak7Days: [Int!]!
+  completionRateLast7Days: [Float!]!
+  completionRate: Float!
+  activityHistory: [Map!]!
+  meta: Map!
 }
 
 input NewTodoParams {

@@ -188,6 +188,56 @@ func (r *queryResolver) Todo(ctx context.Context, id string) (*db.Todo, error) {
 	return &todo, nil
 }
 
+// Healthy is the resolver for the healthy field.
+func (r *queryResolver) Healthy(ctx context.Context) (bool, error) {
+	return true, nil
+}
+
+// TotalTodos is the resolver for the totalTodos field.
+func (r *queryResolver) TotalTodos(ctx context.Context) (int, error) {
+	return r.DB.GetTotalTodos(), nil
+}
+
+// ActivityStreak7Days is the resolver for the activityStreak7Days field.
+func (r *queryResolver) ActivityStreak7Days(ctx context.Context) ([]int, error) {
+	return r.DB.GetSystemActivityHistoryForLast7Days()
+}
+
+// CompletionRateLast7Days is the resolver for the completionRateLast7Days field.
+func (r *queryResolver) CompletionRateLast7Days(ctx context.Context) ([]float64, error) {
+	return r.DB.GetSystemCompletionRateForLast7Days()
+}
+
+// CompletionRate is the resolver for the completionRate field.
+func (r *queryResolver) CompletionRate(ctx context.Context) (float64, error) {
+	return r.DB.GetSystemCompletionRate()
+}
+
+// ActivityHistory is the resolver for the activityHistory field.
+func (r *queryResolver) ActivityHistory(ctx context.Context) ([]map[string]interface{}, error) {
+	todos := []db.Todo{}
+	err := r.DB.GetAllTodos(&todos)
+	if err != nil {
+		return nil, err
+	}
+
+	activityHistory := []map[string]interface{}{}
+	for _, todo := range todos {
+		activityHistory = append(activityHistory, map[string]interface{}{
+			"type":      "created",
+			"user_id":   todo.UserID.String(),
+			"timestamp": todo.CreatedAt.Unix(),
+		})
+	}
+
+	return activityHistory, nil
+}
+
+// Meta is the resolver for the meta field.
+func (r *queryResolver) Meta(ctx context.Context) (map[string]interface{}, error) {
+	return map[string]interface{}{"version": "1.0.0"}, nil
+}
+
 // ID is the resolver for the id field.
 func (r *todoResolver) ID(ctx context.Context, obj *db.Todo) (string, error) {
 	return obj.ID.String(), nil

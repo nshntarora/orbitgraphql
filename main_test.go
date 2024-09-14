@@ -146,10 +146,7 @@ func TestAPIResponseConsistency(t *testing.T) {
 	createdUsers := []db.User{}
 	for i := 0; i < NUMBER_OF_USERS; i++ {
 		user, _, err := cacheClient.CreateRandomUser()
-		if err != nil {
-			fmt.Println("error ", err)
-			return
-		}
+		assert.Nil(t, err)
 		createdUsers = append(createdUsers, *user)
 	}
 
@@ -159,10 +156,7 @@ func TestAPIResponseConsistency(t *testing.T) {
 
 	for i := 0; i < NUMBER_OF_USERS; i++ {
 		users, tt, err := cacheClient.PaginateUsers()
-		if err != nil {
-			fmt.Println("error ", err)
-			return
-		}
+		assert.Nil(t, err)
 		cachedUsersResponses = append(cachedUsersResponses, users...)
 		timeTakenForCacheClient += tt
 	}
@@ -171,10 +165,7 @@ func TestAPIResponseConsistency(t *testing.T) {
 	timeTakenForDefaultClient := time.Duration(0)
 	for i := 0; i < NUMBER_OF_USERS; i++ {
 		users, tt, err := defaultClient.PaginateUsers()
-		if err != nil {
-			fmt.Println("error ", err)
-			return
-		}
+		assert.Nil(t, err)
 		defaultUserResponses = append(defaultUserResponses, users...)
 		timeTakenForDefaultClient += tt
 	}
@@ -184,6 +175,27 @@ func TestAPIResponseConsistency(t *testing.T) {
 
 	assert.Equal(t, len(cachedUsersResponses), len(defaultUserResponses))
 	assert.Equal(t, cachedUsersResponses, defaultUserResponses)
+
+	cachedSystemDetailsResponses := []map[string]interface{}{}
+	defaultSystemDetailsResponses := []map[string]interface{}{}
+	// get system details from cache client and default client
+	for i := 0; i < NUMBER_OF_USERS; i++ {
+		details, _, err := defaultClient.GetSystemDetails()
+		assert.NotNil(t, details)
+		assert.Nil(t, err)
+		defaultSystemDetailsResponses = append(defaultSystemDetailsResponses, details)
+	}
+
+	// get system details from cache client and default client
+	for i := 0; i < NUMBER_OF_USERS; i++ {
+		details, _, err := cacheClient.GetSystemDetails()
+		assert.NotNil(t, details)
+		assert.Nil(t, err)
+		cachedSystemDetailsResponses = append(cachedSystemDetailsResponses, details)
+	}
+
+	assert.Equal(t, len(cachedSystemDetailsResponses), len(defaultSystemDetailsResponses))
+	assert.Equal(t, cachedSystemDetailsResponses, defaultSystemDetailsResponses)
 }
 
 func TestWithTodoOperations(t *testing.T) {

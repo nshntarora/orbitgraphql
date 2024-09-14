@@ -648,6 +648,33 @@ func (c *GraphQLClient) GetTodoByIDWithUser(todoID string) (*db.Todo, time.Durat
 	return &result.Todo, time, nil
 }
 
+func (c *GraphQLClient) GetSystemDetails() (map[string]interface{}, time.Duration, error) {
+	query := `
+        query GetSystemDetails {
+						healthy
+						totalTodos
+						activityStreak7Days
+						completionRateLast7Days
+						completionRate
+						activityHistory
+						meta
+        }
+    `
+	variables := map[string]interface{}{}
+
+	data, time, err := c.MakeRequest(query, variables)
+	if err != nil {
+		return nil, time, err
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(data, &result); err != nil {
+		return nil, time, err
+	}
+
+	return result, time, nil
+}
+
 func (c *GraphQLClient) DeleteEverything() (bool, time.Duration, error) {
 
 	// return true, 0, nil
