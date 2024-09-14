@@ -77,25 +77,31 @@ type ComplexityRoot struct {
 	}
 
 	Todo struct {
-		CreatedAt func(childComplexity int) int
-		Done      func(childComplexity int) int
-		ID        func(childComplexity int) int
-		Text      func(childComplexity int) int
-		UpdatedAt func(childComplexity int) int
-		User      func(childComplexity int) int
-		UserID    func(childComplexity int) int
+		ActivityHistory func(childComplexity int) int
+		CreatedAt       func(childComplexity int) int
+		Done            func(childComplexity int) int
+		ID              func(childComplexity int) int
+		Meta            func(childComplexity int) int
+		Text            func(childComplexity int) int
+		UpdatedAt       func(childComplexity int) int
+		User            func(childComplexity int) int
+		UserID          func(childComplexity int) int
 	}
 
 	User struct {
-		CreatedAt func(childComplexity int) int
-		Email     func(childComplexity int) int
-		ID        func(childComplexity int) int
-		Meta      func(childComplexity int) int
-		Name      func(childComplexity int) int
-		Tags      func(childComplexity int) int
-		Todos     func(childComplexity int) int
-		UpdatedAt func(childComplexity int) int
-		Username  func(childComplexity int) int
+		ActivityStreak7Days     func(childComplexity int) int
+		CompletionRate          func(childComplexity int) int
+		CompletionRateLast7Days func(childComplexity int) int
+		CreatedAt               func(childComplexity int) int
+		Email                   func(childComplexity int) int
+		ID                      func(childComplexity int) int
+		Meta                    func(childComplexity int) int
+		Name                    func(childComplexity int) int
+		Tags                    func(childComplexity int) int
+		Todos                   func(childComplexity int) int
+		TodosCount              func(childComplexity int) int
+		UpdatedAt               func(childComplexity int) int
+		Username                func(childComplexity int) int
 	}
 }
 
@@ -124,15 +130,21 @@ type TodoResolver interface {
 	User(ctx context.Context, obj *db.Todo) (*db.User, error)
 	CreatedAt(ctx context.Context, obj *db.Todo) (string, error)
 	UpdatedAt(ctx context.Context, obj *db.Todo) (string, error)
+	Meta(ctx context.Context, obj *db.Todo) (map[string]interface{}, error)
+	ActivityHistory(ctx context.Context, obj *db.Todo) ([]map[string]interface{}, error)
 }
 type UserResolver interface {
 	ID(ctx context.Context, obj *db.User) (string, error)
 
 	Todos(ctx context.Context, obj *db.User) ([]db.Todo, error)
+	TodosCount(ctx context.Context, obj *db.User) (int, error)
 	CreatedAt(ctx context.Context, obj *db.User) (string, error)
 	UpdatedAt(ctx context.Context, obj *db.User) (string, error)
 	Meta(ctx context.Context, obj *db.User) (*model.MetaInfo, error)
 	Tags(ctx context.Context, obj *db.User) ([]string, error)
+	CompletionRate(ctx context.Context, obj *db.User) (float64, error)
+	CompletionRateLast7Days(ctx context.Context, obj *db.User) ([]float64, error)
+	ActivityStreak7Days(ctx context.Context, obj *db.User) ([]int, error)
 }
 
 type executableSchema struct {
@@ -333,6 +345,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Query.Users(childComplexity, args["query"].(*string), args["page"].(*int), args["perPage"].(*int)), true
 
+	case "Todo.activityHistory":
+		if e.complexity.Todo.ActivityHistory == nil {
+			break
+		}
+
+		return e.complexity.Todo.ActivityHistory(childComplexity), true
+
 	case "Todo.createdAt":
 		if e.complexity.Todo.CreatedAt == nil {
 			break
@@ -353,6 +372,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Todo.ID(childComplexity), true
+
+	case "Todo.meta":
+		if e.complexity.Todo.Meta == nil {
+			break
+		}
+
+		return e.complexity.Todo.Meta(childComplexity), true
 
 	case "Todo.text":
 		if e.complexity.Todo.Text == nil {
@@ -381,6 +407,27 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Todo.UserID(childComplexity), true
+
+	case "User.activityStreak7Days":
+		if e.complexity.User.ActivityStreak7Days == nil {
+			break
+		}
+
+		return e.complexity.User.ActivityStreak7Days(childComplexity), true
+
+	case "User.completionRate":
+		if e.complexity.User.CompletionRate == nil {
+			break
+		}
+
+		return e.complexity.User.CompletionRate(childComplexity), true
+
+	case "User.completionRateLast7Days":
+		if e.complexity.User.CompletionRateLast7Days == nil {
+			break
+		}
+
+		return e.complexity.User.CompletionRateLast7Days(childComplexity), true
 
 	case "User.createdAt":
 		if e.complexity.User.CreatedAt == nil {
@@ -430,6 +477,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.User.Todos(childComplexity), true
+
+	case "User.todosCount":
+		if e.complexity.User.TodosCount == nil {
+			break
+		}
+
+		return e.complexity.User.TodosCount(childComplexity), true
 
 	case "User.updatedAt":
 		if e.complexity.User.UpdatedAt == nil {
@@ -1069,6 +1123,10 @@ func (ec *executionContext) fieldContext_Mutation_createTodo(ctx context.Context
 				return ec.fieldContext_Todo_createdAt(ctx, field)
 			case "updatedAt":
 				return ec.fieldContext_Todo_updatedAt(ctx, field)
+			case "meta":
+				return ec.fieldContext_Todo_meta(ctx, field)
+			case "activityHistory":
+				return ec.fieldContext_Todo_activityHistory(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Todo", field.Name)
 		},
@@ -1140,6 +1198,10 @@ func (ec *executionContext) fieldContext_Mutation_updateTodo(ctx context.Context
 				return ec.fieldContext_Todo_createdAt(ctx, field)
 			case "updatedAt":
 				return ec.fieldContext_Todo_updatedAt(ctx, field)
+			case "meta":
+				return ec.fieldContext_Todo_meta(ctx, field)
+			case "activityHistory":
+				return ec.fieldContext_Todo_activityHistory(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Todo", field.Name)
 		},
@@ -1211,6 +1273,10 @@ func (ec *executionContext) fieldContext_Mutation_markAsDone(ctx context.Context
 				return ec.fieldContext_Todo_createdAt(ctx, field)
 			case "updatedAt":
 				return ec.fieldContext_Todo_updatedAt(ctx, field)
+			case "meta":
+				return ec.fieldContext_Todo_meta(ctx, field)
+			case "activityHistory":
+				return ec.fieldContext_Todo_activityHistory(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Todo", field.Name)
 		},
@@ -1282,6 +1348,10 @@ func (ec *executionContext) fieldContext_Mutation_markAsUndone(ctx context.Conte
 				return ec.fieldContext_Todo_createdAt(ctx, field)
 			case "updatedAt":
 				return ec.fieldContext_Todo_updatedAt(ctx, field)
+			case "meta":
+				return ec.fieldContext_Todo_meta(ctx, field)
+			case "activityHistory":
+				return ec.fieldContext_Todo_activityHistory(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Todo", field.Name)
 		},
@@ -1353,6 +1423,10 @@ func (ec *executionContext) fieldContext_Mutation_deleteTodo(ctx context.Context
 				return ec.fieldContext_Todo_createdAt(ctx, field)
 			case "updatedAt":
 				return ec.fieldContext_Todo_updatedAt(ctx, field)
+			case "meta":
+				return ec.fieldContext_Todo_meta(ctx, field)
+			case "activityHistory":
+				return ec.fieldContext_Todo_activityHistory(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Todo", field.Name)
 		},
@@ -1420,6 +1494,8 @@ func (ec *executionContext) fieldContext_Mutation_createUser(ctx context.Context
 				return ec.fieldContext_User_username(ctx, field)
 			case "todos":
 				return ec.fieldContext_User_todos(ctx, field)
+			case "todosCount":
+				return ec.fieldContext_User_todosCount(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_User_createdAt(ctx, field)
 			case "updatedAt":
@@ -1428,6 +1504,12 @@ func (ec *executionContext) fieldContext_Mutation_createUser(ctx context.Context
 				return ec.fieldContext_User_meta(ctx, field)
 			case "tags":
 				return ec.fieldContext_User_tags(ctx, field)
+			case "completionRate":
+				return ec.fieldContext_User_completionRate(ctx, field)
+			case "completionRateLast7Days":
+				return ec.fieldContext_User_completionRateLast7Days(ctx, field)
+			case "activityStreak7Days":
+				return ec.fieldContext_User_activityStreak7Days(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -1495,6 +1577,8 @@ func (ec *executionContext) fieldContext_Mutation_deleteUser(ctx context.Context
 				return ec.fieldContext_User_username(ctx, field)
 			case "todos":
 				return ec.fieldContext_User_todos(ctx, field)
+			case "todosCount":
+				return ec.fieldContext_User_todosCount(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_User_createdAt(ctx, field)
 			case "updatedAt":
@@ -1503,6 +1587,12 @@ func (ec *executionContext) fieldContext_Mutation_deleteUser(ctx context.Context
 				return ec.fieldContext_User_meta(ctx, field)
 			case "tags":
 				return ec.fieldContext_User_tags(ctx, field)
+			case "completionRate":
+				return ec.fieldContext_User_completionRate(ctx, field)
+			case "completionRateLast7Days":
+				return ec.fieldContext_User_completionRateLast7Days(ctx, field)
+			case "activityStreak7Days":
+				return ec.fieldContext_User_activityStreak7Days(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -1570,6 +1660,8 @@ func (ec *executionContext) fieldContext_Mutation_updateUser(ctx context.Context
 				return ec.fieldContext_User_username(ctx, field)
 			case "todos":
 				return ec.fieldContext_User_todos(ctx, field)
+			case "todosCount":
+				return ec.fieldContext_User_todosCount(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_User_createdAt(ctx, field)
 			case "updatedAt":
@@ -1578,6 +1670,12 @@ func (ec *executionContext) fieldContext_Mutation_updateUser(ctx context.Context
 				return ec.fieldContext_User_meta(ctx, field)
 			case "tags":
 				return ec.fieldContext_User_tags(ctx, field)
+			case "completionRate":
+				return ec.fieldContext_User_completionRate(ctx, field)
+			case "completionRateLast7Days":
+				return ec.fieldContext_User_completionRateLast7Days(ctx, field)
+			case "activityStreak7Days":
+				return ec.fieldContext_User_activityStreak7Days(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -1693,6 +1791,10 @@ func (ec *executionContext) fieldContext_Query_allTodos(_ context.Context, field
 				return ec.fieldContext_Todo_createdAt(ctx, field)
 			case "updatedAt":
 				return ec.fieldContext_Todo_updatedAt(ctx, field)
+			case "meta":
+				return ec.fieldContext_Todo_meta(ctx, field)
+			case "activityHistory":
+				return ec.fieldContext_Todo_activityHistory(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Todo", field.Name)
 		},
@@ -1753,6 +1855,10 @@ func (ec *executionContext) fieldContext_Query_todos(ctx context.Context, field 
 				return ec.fieldContext_Todo_createdAt(ctx, field)
 			case "updatedAt":
 				return ec.fieldContext_Todo_updatedAt(ctx, field)
+			case "meta":
+				return ec.fieldContext_Todo_meta(ctx, field)
+			case "activityHistory":
+				return ec.fieldContext_Todo_activityHistory(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Todo", field.Name)
 		},
@@ -1820,6 +1926,8 @@ func (ec *executionContext) fieldContext_Query_users(ctx context.Context, field 
 				return ec.fieldContext_User_username(ctx, field)
 			case "todos":
 				return ec.fieldContext_User_todos(ctx, field)
+			case "todosCount":
+				return ec.fieldContext_User_todosCount(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_User_createdAt(ctx, field)
 			case "updatedAt":
@@ -1828,6 +1936,12 @@ func (ec *executionContext) fieldContext_Query_users(ctx context.Context, field 
 				return ec.fieldContext_User_meta(ctx, field)
 			case "tags":
 				return ec.fieldContext_User_tags(ctx, field)
+			case "completionRate":
+				return ec.fieldContext_User_completionRate(ctx, field)
+			case "completionRateLast7Days":
+				return ec.fieldContext_User_completionRateLast7Days(ctx, field)
+			case "activityStreak7Days":
+				return ec.fieldContext_User_activityStreak7Days(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -1892,6 +2006,8 @@ func (ec *executionContext) fieldContext_Query_user(ctx context.Context, field g
 				return ec.fieldContext_User_username(ctx, field)
 			case "todos":
 				return ec.fieldContext_User_todos(ctx, field)
+			case "todosCount":
+				return ec.fieldContext_User_todosCount(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_User_createdAt(ctx, field)
 			case "updatedAt":
@@ -1900,6 +2016,12 @@ func (ec *executionContext) fieldContext_Query_user(ctx context.Context, field g
 				return ec.fieldContext_User_meta(ctx, field)
 			case "tags":
 				return ec.fieldContext_User_tags(ctx, field)
+			case "completionRate":
+				return ec.fieldContext_User_completionRate(ctx, field)
+			case "completionRateLast7Days":
+				return ec.fieldContext_User_completionRateLast7Days(ctx, field)
+			case "activityStreak7Days":
+				return ec.fieldContext_User_activityStreak7Days(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -1968,6 +2090,10 @@ func (ec *executionContext) fieldContext_Query_todo(ctx context.Context, field g
 				return ec.fieldContext_Todo_createdAt(ctx, field)
 			case "updatedAt":
 				return ec.fieldContext_Todo_updatedAt(ctx, field)
+			case "meta":
+				return ec.fieldContext_Todo_meta(ctx, field)
+			case "activityHistory":
+				return ec.fieldContext_Todo_activityHistory(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Todo", field.Name)
 		},
@@ -2340,6 +2466,8 @@ func (ec *executionContext) fieldContext_Todo_user(_ context.Context, field grap
 				return ec.fieldContext_User_username(ctx, field)
 			case "todos":
 				return ec.fieldContext_User_todos(ctx, field)
+			case "todosCount":
+				return ec.fieldContext_User_todosCount(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_User_createdAt(ctx, field)
 			case "updatedAt":
@@ -2348,6 +2476,12 @@ func (ec *executionContext) fieldContext_Todo_user(_ context.Context, field grap
 				return ec.fieldContext_User_meta(ctx, field)
 			case "tags":
 				return ec.fieldContext_User_tags(ctx, field)
+			case "completionRate":
+				return ec.fieldContext_User_completionRate(ctx, field)
+			case "completionRateLast7Days":
+				return ec.fieldContext_User_completionRateLast7Days(ctx, field)
+			case "activityStreak7Days":
+				return ec.fieldContext_User_activityStreak7Days(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -2438,6 +2572,94 @@ func (ec *executionContext) fieldContext_Todo_updatedAt(_ context.Context, field
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Todo_meta(ctx context.Context, field graphql.CollectedField, obj *db.Todo) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Todo_meta(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Todo().Meta(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(map[string]interface{})
+	fc.Result = res
+	return ec.marshalNMap2map(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Todo_meta(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Todo",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Map does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Todo_activityHistory(ctx context.Context, field graphql.CollectedField, obj *db.Todo) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Todo_activityHistory(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Todo().ActivityHistory(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]map[string]interface{})
+	fc.Result = res
+	return ec.marshalNMap2ᚕmapᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Todo_activityHistory(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Todo",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Map does not have child fields")
 		},
 	}
 	return fc, nil
@@ -2672,8 +2894,56 @@ func (ec *executionContext) fieldContext_User_todos(_ context.Context, field gra
 				return ec.fieldContext_Todo_createdAt(ctx, field)
 			case "updatedAt":
 				return ec.fieldContext_Todo_updatedAt(ctx, field)
+			case "meta":
+				return ec.fieldContext_Todo_meta(ctx, field)
+			case "activityHistory":
+				return ec.fieldContext_Todo_activityHistory(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Todo", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _User_todosCount(ctx context.Context, field graphql.CollectedField, obj *db.User) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_User_todosCount(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.User().TodosCount(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_User_todosCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "User",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
 		},
 	}
 	return fc, nil
@@ -2858,6 +3128,138 @@ func (ec *executionContext) fieldContext_User_tags(_ context.Context, field grap
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _User_completionRate(ctx context.Context, field graphql.CollectedField, obj *db.User) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_User_completionRate(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.User().CompletionRate(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(float64)
+	fc.Result = res
+	return ec.marshalNFloat2float64(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_User_completionRate(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "User",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Float does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _User_completionRateLast7Days(ctx context.Context, field graphql.CollectedField, obj *db.User) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_User_completionRateLast7Days(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.User().CompletionRateLast7Days(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]float64)
+	fc.Result = res
+	return ec.marshalNFloat2ᚕfloat64ᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_User_completionRateLast7Days(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "User",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Float does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _User_activityStreak7Days(ctx context.Context, field graphql.CollectedField, obj *db.User) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_User_activityStreak7Days(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.User().ActivityStreak7Days(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]int)
+	fc.Result = res
+	return ec.marshalNInt2ᚕintᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_User_activityStreak7Days(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "User",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
 		},
 	}
 	return fc, nil
@@ -5178,6 +5580,78 @@ func (ec *executionContext) _Todo(ctx context.Context, sel ast.SelectionSet, obj
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "meta":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Todo_meta(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "activityHistory":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Todo_activityHistory(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -5273,6 +5747,42 @@ func (ec *executionContext) _User(ctx context.Context, sel ast.SelectionSet, obj
 					}
 				}()
 				res = ec._User_todos(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "todosCount":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._User_todosCount(ctx, field, obj)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -5417,6 +5927,114 @@ func (ec *executionContext) _User(ctx context.Context, sel ast.SelectionSet, obj
 					}
 				}()
 				res = ec._User_tags(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "completionRate":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._User_completionRate(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "completionRateLast7Days":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._User_completionRateLast7Days(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "activityStreak7Days":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._User_activityStreak7Days(ctx, field, obj)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -5807,6 +6425,53 @@ func (ec *executionContext) marshalNBoolean2bool(ctx context.Context, sel ast.Se
 	return res
 }
 
+func (ec *executionContext) unmarshalNFloat2float64(ctx context.Context, v interface{}) (float64, error) {
+	res, err := graphql.UnmarshalFloatContext(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNFloat2float64(ctx context.Context, sel ast.SelectionSet, v float64) graphql.Marshaler {
+	res := graphql.MarshalFloatContext(v)
+	if res == graphql.Null {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+	}
+	return graphql.WrapContextMarshaler(ctx, res)
+}
+
+func (ec *executionContext) unmarshalNFloat2ᚕfloat64ᚄ(ctx context.Context, v interface{}) ([]float64, error) {
+	var vSlice []interface{}
+	if v != nil {
+		vSlice = graphql.CoerceList(v)
+	}
+	var err error
+	res := make([]float64, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNFloat2float64(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) marshalNFloat2ᚕfloat64ᚄ(ctx context.Context, sel ast.SelectionSet, v []float64) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	for i := range v {
+		ret[i] = ec.marshalNFloat2float64(ctx, sel, v[i])
+	}
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
 func (ec *executionContext) unmarshalNID2string(ctx context.Context, v interface{}) (string, error) {
 	res, err := graphql.UnmarshalID(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -5820,6 +6485,106 @@ func (ec *executionContext) marshalNID2string(ctx context.Context, sel ast.Selec
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) unmarshalNInt2int(ctx context.Context, v interface{}) (int, error) {
+	res, err := graphql.UnmarshalInt(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNInt2int(ctx context.Context, sel ast.SelectionSet, v int) graphql.Marshaler {
+	res := graphql.MarshalInt(v)
+	if res == graphql.Null {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+	}
+	return res
+}
+
+func (ec *executionContext) unmarshalNInt2ᚕintᚄ(ctx context.Context, v interface{}) ([]int, error) {
+	var vSlice []interface{}
+	if v != nil {
+		vSlice = graphql.CoerceList(v)
+	}
+	var err error
+	res := make([]int, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNInt2int(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) marshalNInt2ᚕintᚄ(ctx context.Context, sel ast.SelectionSet, v []int) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	for i := range v {
+		ret[i] = ec.marshalNInt2int(ctx, sel, v[i])
+	}
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) unmarshalNMap2map(ctx context.Context, v interface{}) (map[string]interface{}, error) {
+	res, err := graphql.UnmarshalMap(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNMap2map(ctx context.Context, sel ast.SelectionSet, v map[string]interface{}) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	res := graphql.MarshalMap(v)
+	if res == graphql.Null {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+	}
+	return res
+}
+
+func (ec *executionContext) unmarshalNMap2ᚕmapᚄ(ctx context.Context, v interface{}) ([]map[string]interface{}, error) {
+	var vSlice []interface{}
+	if v != nil {
+		vSlice = graphql.CoerceList(v)
+	}
+	var err error
+	res := make([]map[string]interface{}, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNMap2map(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) marshalNMap2ᚕmapᚄ(ctx context.Context, sel ast.SelectionSet, v []map[string]interface{}) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	for i := range v {
+		ret[i] = ec.marshalNMap2map(ctx, sel, v[i])
+	}
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
 }
 
 func (ec *executionContext) marshalNMetaInfo2graphql_cacheᚋtest_apiᚋtodoᚋgraphᚋmodelᚐMetaInfo(ctx context.Context, sel ast.SelectionSet, v model.MetaInfo) graphql.Marshaler {

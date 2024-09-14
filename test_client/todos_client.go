@@ -104,6 +104,10 @@ func (c *GraphQLClient) CreateRandomUser() (*db.User, time.Duration, error) {
 								email
 								username
 								tags
+								todosCount
+								completionRate
+								completionRateLast7Days
+								activityStreak7Days
 								meta {
 									ipAddress
 									userAgent
@@ -144,6 +148,10 @@ func (c *GraphQLClient) UpdateUser(id, name, email, username string) (*db.User, 
 								email
 								username
 								tags
+								todosCount
+								completionRate
+								completionRateLast7Days
+								activityStreak7Days
 								meta {
 									ipAddress
 									userAgent
@@ -185,6 +193,10 @@ func (c *GraphQLClient) DeleteUser(userId string) (*db.User, time.Duration, erro
 								email
 								username
 								tags
+								todosCount
+								completionRate
+								completionRateLast7Days
+								activityStreak7Days
 								meta {
 									ipAddress
 									userAgent
@@ -222,11 +234,18 @@ func (c *GraphQLClient) CreateRandomTodo(userId string) (*db.Todo, time.Duration
 								text
 								done
 								userId
+								meta
+								activityHistory
 								user {
 									id
 									name
 									email
 									username
+									tags
+									todosCount
+									completionRate
+									completionRateLast7Days
+									activityStreak7Days
 									createdAt
 									updatedAt
 								}
@@ -263,11 +282,17 @@ func (c *GraphQLClient) MarkTodoAsDone(todoId string) (*db.Todo, time.Duration, 
 								text
 								done
 								userId
+								meta
+								activityHistory
 								user {
 									id
 									name
 									email
 									username
+									todosCount
+									completionRate
+									completionRateLast7Days
+									activityStreak7Days
 									createdAt
 									updatedAt
 								}
@@ -303,11 +328,17 @@ func (c *GraphQLClient) MarkTodoAsUnDone(todoId string) (*db.Todo, time.Duration
 								text
 								done
 								userId
+								meta
+								activityHistory
 								user {
 									id
 									name
 									email
 									username
+									todosCount
+									completionRate
+									completionRateLast7Days
+									activityStreak7Days
 									createdAt
 									updatedAt
 								}
@@ -343,11 +374,17 @@ func (c *GraphQLClient) DeleteTodo(todoId string) (*db.Todo, time.Duration, erro
 								text
 								done
 								userId
+								meta
+								activityHistory
 								user {
 									id
 									name
 									email
 									username
+									todosCount
+									completionRate
+									completionRateLast7Days
+									activityStreak7Days
 									createdAt
 									updatedAt
 								}
@@ -384,6 +421,10 @@ func (c *GraphQLClient) PaginateUsers() ([]db.User, time.Duration, error) {
                 email
                 username
 								tags
+								todosCount
+								completionRate
+								completionRateLast7Days
+								activityStreak7Days
 								meta {
 									ipAddress
 									userAgent
@@ -425,6 +466,8 @@ func (c *GraphQLClient) PaginateTodos() ([]db.Todo, time.Duration, error) {
                 userId
 								createdAt
 								updatedAt
+								meta
+								activityHistory
             }
         }
     `
@@ -458,6 +501,10 @@ func (c *GraphQLClient) GetUserByID(userID string) (*db.User, time.Duration, err
                 email
                 username
 								tags
+								todosCount
+								completionRate
+								completionRateLast7Days
+								activityStreak7Days
 								meta {
 									ipAddress
 									userAgent
@@ -495,6 +542,11 @@ func (c *GraphQLClient) GetUserTodosByID(userID string) (*db.User, time.Duration
                 name
                 email
                 username
+								tags
+								todosCount
+								completionRate
+								completionRateLast7Days
+								activityStreak7Days
 								todos {
 									id
 									text

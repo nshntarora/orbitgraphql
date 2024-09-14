@@ -352,9 +352,8 @@ func (gc *GraphCache) CacheResponse(queryPrefix string, field string, object map
 				if objMap, ok := obj.(map[string]interface{}); ok {
 					_, k := gc.CacheResponse(queryPrefix, key, objMap, object)
 					responseObjects = append(responseObjects, k)
-				}
-				if objMap, ok := obj.(string); ok {
-					responseObjects = append(responseObjects, objMap)
+				} else {
+					appendToInterfaceArray(obj, &responseObjects)
 				}
 			}
 			if !utils.ArrayContains(responseObjects, "") {
@@ -366,6 +365,13 @@ func (gc *GraphCache) CacheResponse(queryPrefix string, field string, object map
 	cacheKey := gc.CacheObject(queryPrefix, field, object, parent)
 
 	return object, cacheKey
+}
+
+func appendToInterfaceArray[T any](obj interface{}, responseObjects *[]T) {
+	switch v := obj.(type) {
+	case T:
+		*responseObjects = append(*responseObjects, v)
+	}
 }
 
 func (gc *GraphCache) GetQueryResponseKey(queryPrefix string, queryDoc *ast.OperationDefinition, response map[string]interface{}, variables map[string]interface{}) map[string]interface{} {

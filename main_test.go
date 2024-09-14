@@ -61,6 +61,7 @@ func RunUsersOperations(t *testing.T, client *test_client.GraphQLClient) (time.D
 		fmt.Println("error creating user ", err)
 		return totalTimeTaken, err
 	}
+	assert.NotNil(t, user)
 	totalTimeTaken += tt
 
 	client.FlushByType("User", "")

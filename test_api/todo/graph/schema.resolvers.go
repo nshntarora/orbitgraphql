@@ -221,6 +221,38 @@ func (r *todoResolver) UpdatedAt(ctx context.Context, obj *db.Todo) (string, err
 	return obj.UpdatedAt.Format(time.RFC3339), nil
 }
 
+// Meta is the resolver for the meta field.
+func (r *todoResolver) Meta(ctx context.Context, obj *db.Todo) (map[string]interface{}, error) {
+	createdAtUnix := int(obj.CreatedAt.Unix())
+
+	userAgent := ""
+	if ctx.Value("user-agent") != nil {
+		userAgent = ctx.Value("user-agent").(string)
+	}
+
+	ipAddress := ""
+	if ctx.Value("ip-address") != nil {
+		ipAddress = ctx.Value("ip-address").(string)
+	}
+
+	return map[string]interface{}{
+		"ipAddress":    ipAddress,
+		"userAgent":    userAgent,
+		"createdEpoch": createdAtUnix,
+	}, nil
+}
+
+// ActivityHistory is the resolver for the activityHistory field.
+func (r *todoResolver) ActivityHistory(ctx context.Context, obj *db.Todo) ([]map[string]interface{}, error) {
+	return []map[string]interface{}{
+		{
+			"type":      "created",
+			"user_id":   obj.UserID.String(),
+			"timestamp": obj.CreatedAt.Unix(),
+		},
+	}, nil
+}
+
 // ID is the resolver for the id field.
 func (r *userResolver) ID(ctx context.Context, obj *db.User) (string, error) {
 	return obj.ID.String(), nil
@@ -232,6 +264,11 @@ func (r *userResolver) Todos(ctx context.Context, obj *db.User) ([]db.Todo, erro
 	r.DB.GetTodosByUserID(&todos, obj.ID.String())
 
 	return todos, nil
+}
+
+// TodosCount is the resolver for the todosCount field.
+func (r *userResolver) TodosCount(ctx context.Context, obj *db.User) (int, error) {
+	return r.DB.GetTodosCountByUser(obj)
 }
 
 // CreatedAt is the resolver for the createdAt field.
@@ -270,6 +307,21 @@ func (r *userResolver) Tags(ctx context.Context, obj *db.User) ([]string, error)
 	tags := []string{"user", obj.CreatedAt.Month().String(), obj.CreatedAt.Weekday().String()}
 
 	return tags, nil
+}
+
+// CompletionRate is the resolver for the completionRate field.
+func (r *userResolver) CompletionRate(ctx context.Context, obj *db.User) (float64, error) {
+	return r.DB.GetCompletionRateForUser(obj)
+}
+
+// CompletionRateLast7Days is the resolver for the completionRateLast7Days field.
+func (r *userResolver) CompletionRateLast7Days(ctx context.Context, obj *db.User) ([]float64, error) {
+	return r.DB.GetCompletionRateForLast7Days(obj)
+}
+
+// ActivityStreak7Days is the resolver for the activityStreak7Days field.
+func (r *userResolver) ActivityStreak7Days(ctx context.Context, obj *db.User) ([]int, error) {
+	return r.DB.GetActivityHistoryForLast7Days(obj)
 }
 
 // Mutation returns MutationResolver implementation.

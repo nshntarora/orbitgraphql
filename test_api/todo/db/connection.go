@@ -104,6 +104,82 @@ func (d Connection) GetTodosByUserID(todos *[]Todo, userID string) error {
 	return d.DB.Where("user_id=?", userID).Find(todos).Error
 }
 
+func (d Connection) GetCompletionRateForUser(user *User) (float64, error) {
+	var todos []Todo
+	err := d.GetTodosByUserID(&todos, user.ID.String())
+	if err != nil {
+		return 0, err
+	}
+	var completed, total int
+	for _, todo := range todos {
+		total++
+		if todo.Done {
+			completed++
+		}
+	}
+	if total == 0 {
+		return 0, nil
+	}
+	return float64(completed) / float64(total), nil
+}
+
+func (d Connection) GetCompletionRateForLast7Days(user *User) ([]float64, error) {
+	var todos []Todo
+	err := d.GetTodosByUserID(&todos, user.ID.String())
+	if err != nil {
+		return nil, err
+	}
+	completionRates := make([]float64, 7)
+	for i := 0; i < 7; i++ {
+		var completed, total int
+		for _, todo := range todos {
+			if todo.CreatedAt.After(time.Now().AddDate(0, 0, -i)) {
+				total++
+				if todo.Done {
+					completed++
+				}
+			}
+		}
+		if total == 0 {
+			completionRates[i] = 0
+			continue
+		}
+		completionRates[i] = float64(completed) / float64(total)
+	}
+	return completionRates, nil
+}
+
+func (d Connection) GetTodosCountByUser(user *User) (int, error) {
+	var todos []Todo
+	err := d.GetTodosByUserID(&todos, user.ID.String())
+	if err != nil {
+		return 0, err
+	}
+	return len(todos), nil
+}
+
+func (d Connection) GetActivityHistoryForLast7Days(user *User) ([]int, error) {
+	// if the user created a todo then return 1, else return 0
+	var todos []Todo
+	err := d.GetTodosByUserID(&todos, user.ID.String())
+	if err != nil {
+		return nil, err
+	}
+
+	activityHistory := make([]int, 7)
+	for i := 0; i < 7; i++ {
+		var activity int
+		for _, todo := range todos {
+			if todo.CreatedAt.After(time.Now().AddDate(0, 0, -i)) {
+				activity++
+			}
+		}
+		activityHistory[i] = activity
+	}
+
+	return activityHistory, nil
+}
+
 func (d Connection) CreateTodo(todo *Todo) error {
 	todo.CreatedAt = time.Now()
 	todo.UpdatedAt = time.Now()

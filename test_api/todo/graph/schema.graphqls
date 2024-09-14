@@ -1,3 +1,5 @@
+scalar Map
+
 directive @goField(
   forceResolver: Boolean
   name: String
@@ -12,6 +14,8 @@ type Todo {
   user: User! @goField(forceResolver: true)
   createdAt: String!
   updatedAt: String!
+  meta: Map! @goField(forceResolver: true)
+  activityHistory: [Map!]! @goField(forceResolver: true)
 }
 
 type User {
@@ -20,10 +24,14 @@ type User {
   email: String!
   username: String!
   todos: [Todo!]! @goField(forceResolver: true)
+  todosCount: Int! @goField(forceResolver: true)
   createdAt: String!
   updatedAt: String!
   meta: MetaInfo! @goField(forceResolver: true)
-  tags: [String!]!
+  tags: [String!]! @goField(forceResolver: true)
+  completionRate: Float! @goField(forceResolver: true)
+  completionRateLast7Days: [Float!]! @goField(forceResolver: true)
+  activityStreak7Days: [Int!]! @goField(forceResolver: true)
 }
 
 type MetaInfo {
