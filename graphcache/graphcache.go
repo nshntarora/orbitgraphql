@@ -8,11 +8,12 @@ import (
 	"graphql_cache/cache"
 	"graphql_cache/utils"
 	"reflect"
-	"strconv"
 	"strings"
 
 	"github.com/vektah/gqlparser/ast"
 )
+
+const DEFAULT_CACHE_PREFIX = "orbit::"
 
 // GraphCache is a struct that holds the cache stores for the GraphQL cache
 type GraphCache struct {
@@ -22,10 +23,10 @@ type GraphCache struct {
 	queryCacheStore  cache.Cache
 }
 type GraphCacheOptions struct {
-	Backend   CacheBackend
-	RedisHost string
-	RedisPort int
-	Prefix    string
+	QueryStore  cache.Cache
+	ObjectStore cache.Cache
+	RecordStore cache.Cache
+	Prefix      string
 }
 
 type CacheBackend string
@@ -35,29 +36,23 @@ const CacheBackendInMemory CacheBackend = "in_memory"
 
 func NewGraphCache() *GraphCache {
 	return NewGraphCacheWithOptions(&GraphCacheOptions{
-		Backend: CacheBackendInMemory,
+		ObjectStore: cache.NewInMemoryCache(),
+		RecordStore: cache.NewInMemoryCache(),
+		QueryStore:  cache.NewInMemoryCache(),
 	})
 }
 
 func NewGraphCacheWithOptions(opts *GraphCacheOptions) *GraphCache {
-	if opts.Backend == CacheBackendRedis {
-		return &GraphCache{
-			prefix:           opts.Prefix,
-			cacheStore:       cache.NewRedisCache(opts.RedisHost, strconv.Itoa(opts.RedisPort), opts.Prefix),
-			recordCacheStore: cache.NewRedisCache(opts.RedisHost, strconv.Itoa(opts.RedisPort), opts.Prefix),
-			queryCacheStore:  cache.NewRedisCache(opts.RedisHost, strconv.Itoa(opts.RedisPort), opts.Prefix),
-		}
-	}
 	return &GraphCache{
 		prefix:           opts.Prefix,
-		cacheStore:       cache.NewInMemoryCache(opts.Prefix),
-		recordCacheStore: cache.NewInMemoryCache(opts.Prefix),
-		queryCacheStore:  cache.NewInMemoryCache(opts.Prefix),
+		cacheStore:       opts.ObjectStore,
+		recordCacheStore: opts.RecordStore,
+		queryCacheStore:  opts.QueryStore,
 	}
 }
 
-func (gc *GraphCache) SetQueryCache(queryKey string, response interface{}) error {
-	return gc.queryCacheStore.Set(queryKey, response)
+func (gc *GraphCache) Key(key string) string {
+	return DEFAULT_CACHE_PREFIX + "::" + key
 }
 
 func (gc *GraphCache) RemoveTypenameFromResponse(response *GraphQLResponse) (*GraphQLResponse, error) {
@@ -120,7 +115,7 @@ func (gc *GraphCache) deleteTypename(data interface{}) interface{} {
 	return data
 }
 
-func (gc *GraphCache) ParseASTBuildResponse(queryPrefix string, astQuery *ast.QueryDocument, requestBody GraphQLRequest) (interface{}, error) {
+func (gc *GraphCache) ParseASTBuildResponse(astQuery *ast.QueryDocument, requestBody GraphQLRequest) (interface{}, error) {
 
 	if len(astQuery.Operations) == 0 {
 		return nil, errors.New("no operations found in query")
@@ -144,7 +139,7 @@ func (gc *GraphCache) ParseASTBuildResponse(queryPrefix string, astQuery *ast.Qu
 		variableDefinitions = append(variableDefinitions, val.Variable+":"+string(variableBytes))
 	}
 
-	queryResponseKey := "gql:" + queryPrefix + ":" + string(queryType) + ":" + parentKey + "(" + gc.hashString(strings.Join(variableDefinitions, ",")) + ")"
+	queryResponseKey := gc.Key(string(queryType) + ":" + parentKey + "(" + gc.hashString(strings.Join(variableDefinitions, ",")) + ")" + gc.prefix)
 
 	cachedResponse, err := gc.queryCacheStore.Get(queryResponseKey)
 	if err == nil && cachedResponse != nil {
@@ -160,7 +155,7 @@ func (gc *GraphCache) ParseASTBuildResponse(queryPrefix string, astQuery *ast.Qu
 			finalResponse := cachedResponse.(map[string]interface{})
 			for key, value := range finalResponse {
 				if val, ok := value.(string); ok {
-					if strings.HasPrefix(val, "gql:") {
+					if strings.HasPrefix(val, DEFAULT_CACHE_PREFIX) {
 						nestedResponse, err := gc.TraverseResponseFromKey(val)
 						if err != nil || nestedResponse == nil {
 							fmt.Println("Error traversing nested response from key:", val, " ", err)
@@ -172,7 +167,7 @@ func (gc *GraphCache) ParseASTBuildResponse(queryPrefix string, astQuery *ast.Qu
 				if val, ok := value.(map[string]interface{}); ok {
 					for k, v := range val {
 						if v, ok := v.(string); ok {
-							if strings.HasPrefix(v, "gql:") {
+							if strings.HasPrefix(v, DEFAULT_CACHE_PREFIX) {
 								nestedResponse, err := gc.TraverseResponseFromKey(v)
 								if err != nil || nestedResponse == nil {
 									fmt.Println("Error traversing nested response from key:", v, " ", err)
@@ -187,7 +182,7 @@ func (gc *GraphCache) ParseASTBuildResponse(queryPrefix string, astQuery *ast.Qu
 				if val, ok := value.([]interface{}); ok {
 					for i, v := range val {
 						if v, ok := v.(string); ok {
-							if strings.HasPrefix(v, "gql:") {
+							if strings.HasPrefix(v, DEFAULT_CACHE_PREFIX) {
 								nestedResponse, err := gc.TraverseResponseFromKey(v)
 								if err != nil || nestedResponse == nil {
 									fmt.Println("Error traversing nested response from key:", v, " ", err)
@@ -204,7 +199,7 @@ func (gc *GraphCache) ParseASTBuildResponse(queryPrefix string, astQuery *ast.Qu
 					for i, v := range val {
 						for k, v := range v {
 							if v, ok := v.(string); ok {
-								if strings.HasPrefix(v, "gql:") {
+								if strings.HasPrefix(v, DEFAULT_CACHE_PREFIX) {
 									nestedResponse, err := gc.TraverseResponseFromKey(v)
 									if err != nil || nestedResponse == nil {
 										fmt.Println("Error traversing nested response from key:", v, " ", err)
@@ -223,7 +218,7 @@ func (gc *GraphCache) ParseASTBuildResponse(queryPrefix string, astQuery *ast.Qu
 			responseArray := cachedResponse.([]interface{})
 			for i, v := range responseArray {
 				if val, ok := v.(string); ok {
-					if strings.HasPrefix(val, "gql:") {
+					if strings.HasPrefix(val, DEFAULT_CACHE_PREFIX) {
 						nestedResponse, err := gc.TraverseResponseFromKey(val)
 						if err != nil || nestedResponse == nil {
 							fmt.Println("Error traversing nested response from key:", val, " ", err)
@@ -234,7 +229,7 @@ func (gc *GraphCache) ParseASTBuildResponse(queryPrefix string, astQuery *ast.Qu
 				} else if obj, ok := v.(map[string]interface{}); ok {
 					for key, value := range obj {
 						if val, ok := value.(string); ok {
-							if strings.HasPrefix(val, "gql:") {
+							if strings.HasPrefix(val, DEFAULT_CACHE_PREFIX) {
 								nestedResponse, err := gc.TraverseResponseFromKey(val)
 								if err != nil || nestedResponse == nil {
 									fmt.Println("Error traversing nested response from key:", val, " ", err)
@@ -255,7 +250,8 @@ func (gc *GraphCache) ParseASTBuildResponse(queryPrefix string, astQuery *ast.Qu
 
 func (gc *GraphCache) TraverseResponseFromKey(response interface{}) (interface{}, error) {
 	if val, ok := response.(string); ok {
-		if strings.HasPrefix(val, "gql:") {
+		if strings.HasPrefix(val, DEFAULT_CACHE_PREFIX) {
+			fmt.Println("value - ", val)
 			response, err := gc.cacheStore.Get(val)
 			if err != nil {
 				fmt.Println("Error getting response from cache:", err)
@@ -266,7 +262,7 @@ func (gc *GraphCache) TraverseResponseFromKey(response interface{}) (interface{}
 	} else if responseMap, ok := response.(map[string]interface{}); ok {
 		for key, value := range responseMap {
 			if val, ok := value.(string); ok { // handle other data types, arrays and objects
-				if strings.HasPrefix(val, "gql:") {
+				if strings.HasPrefix(val, DEFAULT_CACHE_PREFIX) {
 					nestedResponse, err := gc.TraverseResponseFromKey(val)
 					if err != nil {
 						fmt.Println("Error traversing nested response from key:", val, " ", err)
@@ -277,7 +273,7 @@ func (gc *GraphCache) TraverseResponseFromKey(response interface{}) (interface{}
 			} else if val, ok := value.(map[string]interface{}); ok {
 				for k, v := range val {
 					if v, ok := v.(string); ok {
-						if strings.HasPrefix(v, "gql:") {
+						if strings.HasPrefix(v, DEFAULT_CACHE_PREFIX) {
 							nestedResponse, err := gc.TraverseResponseFromKey(v)
 							if err != nil {
 								fmt.Println("Error traversing nested response from key:", v, " ", err)
@@ -290,7 +286,7 @@ func (gc *GraphCache) TraverseResponseFromKey(response interface{}) (interface{}
 			} else if val, ok := value.([]interface{}); ok {
 				for i, v := range val {
 					if v, ok := v.(string); ok {
-						if strings.HasPrefix(v, "gql:") {
+						if strings.HasPrefix(v, DEFAULT_CACHE_PREFIX) {
 							nestedResponse, err := gc.TraverseResponseFromKey(v)
 							if err != nil {
 								fmt.Println("Error traversing nested response from key:", v, " ", err)
@@ -308,7 +304,7 @@ func (gc *GraphCache) TraverseResponseFromKey(response interface{}) (interface{}
 	return nil, errors.New("error traversing response from key")
 }
 
-func (gc *GraphCache) CacheObject(queryPrefix string, field string, object map[string]interface{}, parent map[string]interface{}) string {
+func (gc *GraphCache) CacheObject(field string, object map[string]interface{}, parent map[string]interface{}) string {
 	objectKeys := make([]string, 0)
 
 	for key := range object {
@@ -327,34 +323,34 @@ func (gc *GraphCache) CacheObject(queryPrefix string, field string, object map[s
 	if utils.StringArrayContainsString(objectKeys, "__typename") && utils.StringArrayContainsString(objectKeys, "id") {
 		typename := object["__typename"].(string)
 		id := object["id"].(string)
-		cacheKey := "gql:" + queryPrefix + ":" + typename + ":" + id
-		gc.cacheStore.Set(cacheKey, object)
+		cacheKey := typename + ":" + id
+		gc.cacheStore.Set(gc.Key(cacheKey), object)
 
 		for key, value := range object {
-			gc.recordCacheStore.Set(cacheKey+":"+key, value)
+			gc.recordCacheStore.Set(gc.Key(cacheKey+":"+key), value)
 		}
 
-		return cacheKey
+		return gc.Key(cacheKey)
 	} else if utils.StringArrayContainsString(objectKeys, "__typename") && !utils.StringArrayContainsString(objectKeys, "id") && parent != nil && utils.StringArrayContainsString(parentKeys, "id") && utils.StringArrayContainsString(parentKeys, "__typename") {
 		typename := parent["__typename"].(string)
 		parentID := parent["id"].(string)
-		cacheKey := "gql:" + queryPrefix + ":" + typename + ":" + parentID + ":" + field
-		gc.cacheStore.Set(cacheKey, object)
+		cacheKey := typename + ":" + parentID + ":" + field
+		gc.cacheStore.Set(gc.Key(cacheKey), object)
 
 		for key, value := range object {
-			gc.recordCacheStore.Set(cacheKey+":"+key, value)
+			gc.recordCacheStore.Set(gc.Key(cacheKey+":"+key), value)
 		}
 
-		return cacheKey
+		return gc.Key(cacheKey)
 	}
 
 	return ""
 }
 
-func (gc *GraphCache) CacheResponse(queryPrefix string, field string, object map[string]interface{}, parent map[string]interface{}) (interface{}, string) {
+func (gc *GraphCache) CacheResponse(field string, object map[string]interface{}, parent map[string]interface{}) (interface{}, string) {
 	for key, value := range object {
 		if nestedObj, ok := value.(map[string]interface{}); ok {
-			_, k := gc.CacheResponse(queryPrefix, key, nestedObj, object)
+			_, k := gc.CacheResponse(key, nestedObj, object)
 			if k != "" {
 				object[key] = k
 			}
@@ -362,7 +358,7 @@ func (gc *GraphCache) CacheResponse(queryPrefix string, field string, object map
 		if objArray, ok := value.([]map[string]interface{}); ok {
 			responseObjects := make([]interface{}, 0)
 			for _, obj := range objArray {
-				_, k := gc.CacheResponse(queryPrefix, key, obj, object)
+				_, k := gc.CacheResponse(key, obj, object)
 				responseObjects = append(responseObjects, k)
 			}
 			if !utils.ArrayContains(responseObjects, "") {
@@ -373,7 +369,7 @@ func (gc *GraphCache) CacheResponse(queryPrefix string, field string, object map
 			responseObjects := make([]interface{}, 0)
 			for _, obj := range objArray {
 				if objMap, ok := obj.(map[string]interface{}); ok {
-					_, k := gc.CacheResponse(queryPrefix, key, objMap, object)
+					_, k := gc.CacheResponse(key, objMap, object)
 					responseObjects = append(responseObjects, k)
 				} else {
 					appendToInterfaceArray(obj, &responseObjects)
@@ -385,7 +381,7 @@ func (gc *GraphCache) CacheResponse(queryPrefix string, field string, object map
 		}
 	}
 
-	cacheKey := gc.CacheObject(queryPrefix, field, object, parent)
+	cacheKey := gc.CacheObject(field, object, parent)
 
 	return object, cacheKey
 }
@@ -397,7 +393,17 @@ func appendToInterfaceArray[T any](obj interface{}, responseObjects *[]T) {
 	}
 }
 
-func (gc *GraphCache) GetQueryResponseKey(queryPrefix string, queryDoc *ast.OperationDefinition, response map[string]interface{}, variables map[string]interface{}) map[string]interface{} {
+func (gc *GraphCache) CacheOperation(queryDoc *ast.OperationDefinition, response map[string]interface{}, variables map[string]interface{}) map[string]interface{} {
+	responseKey := gc.GetQueryResponseKey(queryDoc, response, variables)
+	for key, value := range responseKey {
+		if value != nil {
+			gc.queryCacheStore.Set(key, value)
+		}
+	}
+	return responseKey
+}
+
+func (gc *GraphCache) GetQueryResponseKey(queryDoc *ast.OperationDefinition, response map[string]interface{}, variables map[string]interface{}) map[string]interface{} {
 	queryType := queryDoc.Operation
 	parentKey := queryDoc.Name
 
@@ -416,11 +422,11 @@ func (gc *GraphCache) GetQueryResponseKey(queryPrefix string, queryDoc *ast.Oper
 
 	responseData := response["data"].(map[string]interface{})
 
-	relationGraph["gql:"+queryPrefix+":"+string(queryType)+":"+parentKey+"("+gc.hashString(strings.Join(variableDefinitions, ","))+")"] = gc.GetResponseTypeID(queryPrefix, queryDoc.SelectionSet, responseData)
+	relationGraph[gc.Key(string(queryType)+":"+parentKey+"("+gc.hashString(strings.Join(variableDefinitions, ","))+")"+gc.prefix)] = gc.GetResponseTypeID(queryDoc.SelectionSet, responseData)
 	return relationGraph
 }
 
-func (gc *GraphCache) GetResponseTypeID(queryPrefix string, selectionSet ast.SelectionSet, response map[string]interface{}) interface{} {
+func (gc *GraphCache) GetResponseTypeID(selectionSet ast.SelectionSet, response map[string]interface{}) interface{} {
 	updatedSelectionSet := ast.SelectionSet{}
 	// remove __typename field from the selection set
 	for _, selection := range selectionSet {
@@ -451,7 +457,7 @@ func (gc *GraphCache) GetResponseTypeID(queryPrefix string, selectionSet ast.Sel
 			if ok && selectionRespone != nil && selectionRespone["id"] != nil && selectionRespone["__typename"] != nil {
 				id := selectionRespone["id"].(string)
 				typeName := selectionRespone["__typename"].(string)
-				return map[string]interface{}{updatedSelectionSet[0].(*ast.Field).Name: "gql:" + queryPrefix + ":" + typeName + ":" + id}
+				return map[string]interface{}{updatedSelectionSet[0].(*ast.Field).Name: gc.Key(typeName + ":" + id)}
 			}
 		case reflect.Slice:
 			selectionRespone, ok := response[selection.Name].([]interface{})
@@ -462,7 +468,7 @@ func (gc *GraphCache) GetResponseTypeID(queryPrefix string, selectionSet ast.Sel
 						if objMap["id"] != nil && objMap["__typename"] != nil {
 							id := objMap["id"].(string)
 							typeName := objMap["__typename"].(string)
-							responseObjects = append(responseObjects, "gql:"+queryPrefix+":"+typeName+":"+id)
+							responseObjects = append(responseObjects, gc.Key(typeName+":"+id))
 						}
 					}
 				}
@@ -563,25 +569,25 @@ func (gc *GraphCache) InvalidateCacheObject(field string, object map[string]inte
 	if utils.StringArrayContainsString(objectKeys, "__typename") && utils.StringArrayContainsString(objectKeys, "id") {
 		typename := object["__typename"].(string)
 		id := object["id"].(string)
-		cacheKey := "gql:*:" + typename + ":" + id
-		gc.cacheStore.DeleteByPrefix(cacheKey)
+		cacheKey := typename + ":" + id
+		gc.cacheStore.DeleteByPrefix(gc.Key(cacheKey))
 
 		for key := range object {
-			gc.recordCacheStore.Del(cacheKey + ":" + key)
+			gc.recordCacheStore.Del(gc.Key(cacheKey + ":" + key))
 		}
 
-		return cacheKey
+		return gc.Key(cacheKey)
 	} else if utils.StringArrayContainsString(objectKeys, "__typename") && !utils.StringArrayContainsString(objectKeys, "id") && parent != nil && utils.StringArrayContainsString(parentKeys, "id") && utils.StringArrayContainsString(parentKeys, "__typename") {
 		typename := parent["__typename"].(string)
 		parentID := parent["id"].(string)
-		cacheKey := "gql:*:" + typename + ":" + parentID + ":" + field
-		gc.cacheStore.DeleteByPrefix(cacheKey)
+		cacheKey := typename + ":" + parentID + ":" + field
+		gc.cacheStore.DeleteByPrefix(gc.Key(cacheKey))
 
 		for key := range object {
-			gc.recordCacheStore.Del(cacheKey + ":" + key)
+			gc.recordCacheStore.Del(gc.Key(cacheKey + ":" + key))
 		}
 
-		return cacheKey
+		return gc.Key(cacheKey)
 	}
 
 	return ""
@@ -613,7 +619,7 @@ func (gc *GraphCache) Flush() {
 }
 
 func (gc *GraphCache) FlushByType(typeName string, id string) {
-	gc.cacheStore.DeleteByPrefix("gql:*" + typeName + ":" + id)
-	gc.recordCacheStore.DeleteByPrefix("gql:*" + typeName + ":" + id)
-	gc.queryCacheStore.DeleteByPrefix("gql:*" + typeName + ":" + id)
+	gc.cacheStore.DeleteByPrefix(gc.Key(typeName + ":" + id))
+	gc.recordCacheStore.DeleteByPrefix(gc.Key(typeName + ":" + id))
+	gc.queryCacheStore.DeleteByPrefix(gc.Key(typeName + ":" + id))
 }

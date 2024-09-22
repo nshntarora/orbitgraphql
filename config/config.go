@@ -5,14 +5,16 @@ import (
 	"log"
 	"os"
 
-	"github.com/BurntSushi/toml"
+	"github.com/pelletier/go-toml/v2"
 )
 
 type Config struct {
-	Origin       string `toml:"origin"`
-	Port         int    `toml:"port"`
-	CacheBackend string `toml:"cache_backend"`
-	Handlers     struct {
+	Origin          string   `toml:"origin"`
+	Port            int      `toml:"port"`
+	CacheBackend    string   `toml:"cache_backend"`
+	CacheHeaderName string   `toml:"cache_header_name"`
+	ScopeHeaders    []string `toml:"scope_headers"`
+	Handlers        struct {
 		GraphQLPath     string `toml:"graphql_path"`
 		FlushAllPath    string `toml:"flush_all_path"`
 		FlushByTypePath string `toml:"flush_by_type_path"`
@@ -23,8 +25,6 @@ type Config struct {
 		Host string `toml:"host"`
 		Port int    `toml:"port"`
 	} `toml:"redis"`
-	CacheHeaderName string   `toml:"cache_header_name"`
-	ScopeHeaders    []string `toml:"scope_headers"`
 }
 
 const CONFIG_FILE = "./config.toml"
@@ -51,7 +51,7 @@ func NewConfig() *Config {
 	}
 
 	var cfg Config
-	_, err = toml.Decode(string(fileContent), &cfg)
+	err = toml.Unmarshal(fileContent, &cfg)
 	if err != nil {
 		log.Panic(err)
 	}

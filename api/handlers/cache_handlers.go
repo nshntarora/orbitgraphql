@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"graphql_cache/config"
@@ -19,7 +18,6 @@ const CACHE_STATUS_MISS = "MISS"
 
 func GetCacheHandler(cfg *config.Config) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		cache := graphcache.NewGraphCacheWithOptions(GetCacheOptions(cfg, GetScopeValues(cfg, r)))
 		w.Header().Add("Content-Type", "application/json")
 
 		// Create a new HTTP request with the same method, URL, and body as the original request
@@ -64,16 +62,12 @@ func GetCacheHandler(cfg *config.Config) http.HandlerFunc {
 			fmt.Println(err)
 			http.Error(w, "error reading request body", http.StatusInternalServerError)
 		}
+		proxyReq.Body = io.NopCloser(bytes.NewBuffer(requestBody))
 
 		request := graphcache.GraphQLRequest{}
 		request.FromBytes(requestBody)
 
-		varStr := ""
-		for key, value := range request.Variables {
-			varStr = varStr + key + ":" + fmt.Sprintf("%v", value)
-		}
-
-		cacheKeyPrefix := base64.StdEncoding.EncodeToString([]byte(request.Query + varStr))
+		cache := graphcache.NewGraphCacheWithOptions(GetCacheOptions(cfg, GetScopeValues(cfg, proxyReq)))
 
 		start := time.Now()
 
@@ -131,7 +125,7 @@ func GetCacheHandler(cfg *config.Config) http.HandlerFunc {
 			return
 		}
 
-		cachedResponse, err := cache.ParseASTBuildResponse(cacheKeyPrefix, astQuery, request)
+		cachedResponse, err := cache.ParseASTBuildResponse(astQuery, request)
 		if err == nil && cachedResponse != nil {
 			fmt.Println("serving response from cache...")
 			br, err := json.Marshal(cachedResponse)
@@ -188,12 +182,13 @@ func GetCacheHandler(cfg *config.Config) http.HandlerFunc {
 
 		for _, op := range astWithTypes.Operations {
 			// for the operation op we need to traverse the response and build the relationship map where key is the requested field and value is the key where the actual response is stored in the cache
-			responseKey := cache.GetQueryResponseKey(cacheKeyPrefix, op, responseMap, variables)
-			for key, value := range responseKey {
-				if value != nil {
-					cache.SetQueryCache(key, value)
-				}
-			}
+			cache.CacheOperation(op, responseMap, variables)
+			// responseKey := cache.GetQueryResponseKey(op, responseMap, variables)
+			// for key, value := range responseKey {
+			// 	if value != nil {
+			// 		cache.SetQueryCache(key, value)
+			// 	}
+			// }
 		}
 
 		fmt.Println("time taken to build response key ", time.Since(start))
@@ -203,7 +198,7 @@ func GetCacheHandler(cfg *config.Config) http.HandlerFunc {
 		// if the object has a nested object with __typename: "User" and id: "5678", cache
 		// it as User:5678
 
-		cache.CacheResponse(cacheKeyPrefix, "data", responseMap, nil)
+		cache.CacheResponse("data", responseMap, nil)
 
 		fmt.Println("time taken to cache response ", time.Since(start), responseMap)
 

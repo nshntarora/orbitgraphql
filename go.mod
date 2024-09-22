@@ -1,12 +1,14 @@
 module graphql_cache
 
-go 1.20
+go 1.21.0
+
+toolchain go1.22.5
 
 require (
 	github.com/99designs/gqlgen v0.17.49
-	github.com/BurntSushi/toml v1.3.2
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/google/uuid v1.6.0
+	github.com/pelletier/go-toml/v2 v2.2.3
 	github.com/stretchr/testify v1.9.0
 	github.com/vektah/gqlparser v1.3.1
 	github.com/vektah/gqlparser/v2 v2.5.16

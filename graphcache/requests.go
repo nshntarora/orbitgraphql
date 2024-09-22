@@ -3,8 +3,9 @@ package graphcache
 import "encoding/json"
 
 type GraphQLRequest struct {
-	Query     string                 `json:"query"`
-	Variables map[string]interface{} `json:"variables"`
+	OperationName string                 `json:"operationName"`
+	Query         string                 `json:"query"`
+	Variables     map[string]interface{} `json:"variables"`
 }
 
 func (gr *GraphQLRequest) Map() map[string]interface{} {

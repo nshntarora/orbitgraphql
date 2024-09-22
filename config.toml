@@ -13,6 +13,15 @@ origin="http://localhost:8080/graphql"
 port=9090
 
 
+# The returns cache hit or cache miss in the header you specify here. Default is X-Orbit-Cache
+cache_header_name="X-Orbit-Cache"
+
+# If you have an authenticated API and want to separate the cache based on what the headers are, you can configure the headers here.
+# The system will scope the cache based on the unique values of the headers you provide
+# For example, if you want to scope the cache based on the Authorization header, you can set the following:
+scope_headers=[ "Authorization", "X-API-Key" ]
+
+
 # We also need to configure the cache backend, do you want to cache the values in memory or in redis. Currently only in memory and redis is supported. Here is a list of supported values for cache_backend:
 # redis
 # in_memory
@@ -25,16 +34,9 @@ port=6379
 
 
 # If you want to override the API paths for the cache server, you can configure them here.
-
 [handlers]
-# flush_all_path="/flush"
-# flush_by_type_path="/flush.type"
-# debug_path="/debug"
-# health_path="/health"
-# graphql_path="/graphql"
-
-
-# If you have an authenticated API and want to separate the cache based on what the headers are, you can configure the headers here.
-# The system will scope the cache based on the unique values of the headers you provide
-# For example, if you want to scope the cache based on the Authorization header, you can set the following:
-scope_headers=["Authorization", "X-API-Key"]
+flush_all_path="/flush"
+flush_by_type_path="/flush.type"
+debug_path="/debug"
+health_path="/health"
+graphql_path="/graphql"

@@ -3,25 +3,24 @@ package cache
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"graphql_cache/utils/file_utils"
 	"regexp"
 	"strings"
 )
 
 type InMemoryCache struct {
-	data   map[string]interface{}
-	prefix string
+	data map[string]interface{}
 }
 
-func NewInMemoryCache(prefix string) *InMemoryCache {
+func NewInMemoryCache() *InMemoryCache {
 	return &InMemoryCache{
-		data:   make(map[string]interface{}),
-		prefix: prefix,
+		data: make(map[string]interface{}),
 	}
 }
 
 func (c *InMemoryCache) Key(key string) string {
-	return c.prefix + key
+	return key
 }
 
 func (c *InMemoryCache) Set(key string, value interface{}) error {
@@ -73,12 +72,16 @@ func (c *InMemoryCache) Flush() error {
 }
 
 func (c *InMemoryCache) DeleteByPrefix(prefix string) error {
+	fmt.Println("deleting by prefix ", prefix)
 	var re = regexp.MustCompile(`(?m)` + strings.ReplaceAll(c.Key(prefix), "*", ".*"))
+
+	fmt.Println("regex: ", re)
 
 	for k := range c.data {
 		// regex match the prefix to the key
 		// if the key is gql:* then delete all keys which start with gql
 		if re.Match([]byte(k)) {
+			fmt.Println("deleting key: ", k)
 			c.Del(k)
 		}
 	}
