@@ -23,7 +23,8 @@ type Config struct {
 		Host string `toml:"host"`
 		Port int    `toml:"port"`
 	} `toml:"redis"`
-	CacheHeaderName string `toml:"cache_header_name"`
+	CacheHeaderName string   `toml:"cache_header_name"`
+	ScopeHeaders    []string `toml:"scope_headers"`
 }
 
 const CONFIG_FILE = "./config.toml"

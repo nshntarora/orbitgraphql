@@ -32,3 +32,9 @@ port=6379
 # debug_path="/debug"
 # health_path="/health"
 # graphql_path="/graphql"
+
+
+# If you have an authenticated API and want to separate the cache based on what the headers are, you can configure the headers here.
+# The system will scope the cache based on the unique values of the headers you provide
+# For example, if you want to scope the cache based on the Authorization header, you can set the following:
+scope_headers=["Authorization", "X-API-Key"]

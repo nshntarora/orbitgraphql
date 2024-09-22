@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"graphql_cache/cache"
-	"graphql_cache/config"
 	"graphql_cache/utils"
 	"reflect"
 	"strconv"
@@ -17,23 +16,43 @@ import (
 
 // GraphCache is a struct that holds the cache stores for the GraphQL cache
 type GraphCache struct {
+	prefix           string
 	cacheStore       cache.Cache
 	recordCacheStore cache.Cache
 	queryCacheStore  cache.Cache
 }
+type GraphCacheOptions struct {
+	Backend   CacheBackend
+	RedisHost string
+	RedisPort int
+	Prefix    string
+}
 
-func NewGraphCache(cfg *config.Config) *GraphCache {
-	if cfg.CacheBackend == "redis" {
+type CacheBackend string
+
+const CacheBackendRedis CacheBackend = "redis"
+const CacheBackendInMemory CacheBackend = "in_memory"
+
+func NewGraphCache() *GraphCache {
+	return NewGraphCacheWithOptions(&GraphCacheOptions{
+		Backend: CacheBackendInMemory,
+	})
+}
+
+func NewGraphCacheWithOptions(opts *GraphCacheOptions) *GraphCache {
+	if opts.Backend == CacheBackendRedis {
 		return &GraphCache{
-			cacheStore:       cache.NewRedisCache(cfg.Redis.Host, strconv.Itoa(cfg.Redis.Port)),
-			recordCacheStore: cache.NewRedisCache(cfg.Redis.Host, strconv.Itoa(cfg.Redis.Port)),
-			queryCacheStore:  cache.NewRedisCache(cfg.Redis.Host, strconv.Itoa(cfg.Redis.Port)),
+			prefix:           opts.Prefix,
+			cacheStore:       cache.NewRedisCache(opts.RedisHost, strconv.Itoa(opts.RedisPort), opts.Prefix),
+			recordCacheStore: cache.NewRedisCache(opts.RedisHost, strconv.Itoa(opts.RedisPort), opts.Prefix),
+			queryCacheStore:  cache.NewRedisCache(opts.RedisHost, strconv.Itoa(opts.RedisPort), opts.Prefix),
 		}
 	}
 	return &GraphCache{
-		cacheStore:       cache.NewInMemoryCache(),
-		recordCacheStore: cache.NewInMemoryCache(),
-		queryCacheStore:  cache.NewInMemoryCache(),
+		prefix:           opts.Prefix,
+		cacheStore:       cache.NewInMemoryCache(opts.Prefix),
+		recordCacheStore: cache.NewInMemoryCache(opts.Prefix),
+		queryCacheStore:  cache.NewInMemoryCache(opts.Prefix),
 	}
 }
 

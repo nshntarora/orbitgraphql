@@ -9,22 +9,28 @@ import (
 )
 
 type InMemoryCache struct {
-	data map[string]interface{}
+	data   map[string]interface{}
+	prefix string
 }
 
-func NewInMemoryCache() *InMemoryCache {
+func NewInMemoryCache(prefix string) *InMemoryCache {
 	return &InMemoryCache{
-		data: make(map[string]interface{}),
+		data:   make(map[string]interface{}),
+		prefix: prefix,
 	}
 }
 
+func (c *InMemoryCache) Key(key string) string {
+	return c.prefix + key
+}
+
 func (c *InMemoryCache) Set(key string, value interface{}) error {
-	c.data[key] = deepCopy(value)
+	c.data[c.Key(key)] = deepCopy(value)
 	return nil
 }
 
 func (c *InMemoryCache) Get(key string) (interface{}, error) {
-	value, exists := c.data[key]
+	value, exists := c.data[c.Key(key)]
 	if !exists {
 		return nil, errors.New("key not found")
 	}
@@ -32,12 +38,12 @@ func (c *InMemoryCache) Get(key string) (interface{}, error) {
 }
 
 func (c *InMemoryCache) Del(key string) error {
-	c.Set(key, nil)
+	c.Set(c.Key(key), nil)
 	return nil
 }
 
 func (c *InMemoryCache) Exists(key string) (bool, error) {
-	_, exists := c.data[key]
+	_, exists := c.data[c.Key(key)]
 	return exists, nil
 }
 
@@ -67,7 +73,7 @@ func (c *InMemoryCache) Flush() error {
 }
 
 func (c *InMemoryCache) DeleteByPrefix(prefix string) error {
-	var re = regexp.MustCompile(`(?m)` + strings.ReplaceAll(prefix, "*", ".*"))
+	var re = regexp.MustCompile(`(?m)` + strings.ReplaceAll(c.Key(prefix), "*", ".*"))
 
 	for k := range c.data {
 		// regex match the prefix to the key

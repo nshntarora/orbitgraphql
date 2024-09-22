@@ -18,10 +18,11 @@ import (
 type GraphQLClient struct {
 	baseURL    string
 	graphqlURL string
+	headers    map[string]interface{}
 }
 
-func NewGraphQLClient(graphqlURL string, baseURL string) *GraphQLClient {
-	return &GraphQLClient{graphqlURL: graphqlURL, baseURL: baseURL}
+func NewGraphQLClient(graphqlURL string, baseURL string, headers map[string]interface{}) *GraphQLClient {
+	return &GraphQLClient{graphqlURL: graphqlURL, baseURL: baseURL, headers: headers}
 }
 
 type GraphQLRequest struct {
@@ -39,7 +40,18 @@ func (c *GraphQLClient) MakeRequest(buf *bytes.Buffer, contentType string) (json
 
 	responseHeaders := make(map[string]interface{})
 
-	resp, err := http.Post(c.graphqlURL, contentType, buf)
+	req, err := http.NewRequest("POST", c.graphqlURL, buf)
+	if err != nil {
+		return nil, responseHeaders, time.Since(start), err
+	}
+
+	req.Header.Set("Content-Type", contentType)
+	for k, v := range c.headers {
+		req.Header.Set(k, fmt.Sprintf("%v", v))
+	}
+
+	client := http.Client{}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, responseHeaders, time.Since(start), err
 	}
@@ -67,16 +79,15 @@ func (c *GraphQLClient) MakeRequest(buf *bytes.Buffer, contentType string) (json
 	return response.Data, responseHeaders, time.Since(start), nil
 }
 
-func (c *GraphQLClient) MakeJSONRequest(query string, variables map[string]interface{}) (json.RawMessage, time.Duration, error) {
+func (c *GraphQLClient) MakeJSONRequest(query string, variables map[string]interface{}) (json.RawMessage, map[string]interface{}, time.Duration, error) {
 	start := time.Now()
 	requestBody, err := json.Marshal(GraphQLRequest{Query: query, Variables: variables})
-
 	if err != nil {
-		return nil, time.Since(start), err
+		return nil, nil, time.Since(start), err
 	}
 
-	res, _, tt, err := c.MakeRequest(bytes.NewBuffer(requestBody), "application/json")
-	return res, tt, err
+	res, headers, tt, err := c.MakeRequest(bytes.NewBuffer(requestBody), "application/json")
+	return res, headers, tt, err
 }
 
 func (c *GraphQLClient) FlushCache() error {
@@ -111,7 +122,7 @@ func (c *GraphQLClient) FlushByType(typeName, id string) error {
 	return nil
 }
 
-func (c *GraphQLClient) CreateRandomUser() (*db.User, time.Duration, error) {
+func (c *GraphQLClient) CreateRandomUser() (*db.User, map[string]interface{}, time.Duration, error) {
 	query := `
         mutation CreateUser($name: String!, $email: String!, $username: String!) {
             createUser(name: $name, email: $email, username: $username) {
@@ -140,22 +151,22 @@ func (c *GraphQLClient) CreateRandomUser() (*db.User, time.Duration, error) {
 		"username": fmt.Sprintf("user%d", rand.Intn(1000)),
 	}
 
-	data, time, err := c.MakeJSONRequest(query, variables)
+	data, headers, time, err := c.MakeJSONRequest(query, variables)
 	if err != nil {
-		return nil, time, err
+		return nil, headers, time, err
 	}
 
 	var result struct {
 		CreateUser db.User `json:"createUser"`
 	}
 	if err := json.Unmarshal(data, &result); err != nil {
-		return nil, time, err
+		return nil, headers, time, err
 	}
 
-	return &result.CreateUser, time, nil
+	return &result.CreateUser, headers, time, nil
 }
 
-func (c *GraphQLClient) UpdateUser(id, name, email, username string) (*db.User, time.Duration, error) {
+func (c *GraphQLClient) UpdateUser(id, name, email, username string) (*db.User, map[string]interface{}, time.Duration, error) {
 	query := `
         mutation UpdateUser($id: String!, $name: String, $email: String, $username: String) {
             updateUser(id: $id, name: $name, email: $email, username: $username) {
@@ -185,22 +196,22 @@ func (c *GraphQLClient) UpdateUser(id, name, email, username string) (*db.User, 
 		"email":    email,
 	}
 
-	data, time, err := c.MakeJSONRequest(query, variables)
+	data, headers, time, err := c.MakeJSONRequest(query, variables)
 	if err != nil {
-		return nil, time, err
+		return nil, headers, time, err
 	}
 
 	var result struct {
 		UpdateUser db.User `json:"updateUser"`
 	}
 	if err := json.Unmarshal(data, &result); err != nil {
-		return nil, time, err
+		return nil, headers, time, err
 	}
 
-	return &result.UpdateUser, time, nil
+	return &result.UpdateUser, headers, time, nil
 }
 
-func (c *GraphQLClient) DeleteUser(userId string) (*db.User, time.Duration, error) {
+func (c *GraphQLClient) DeleteUser(userId string) (*db.User, map[string]interface{}, time.Duration, error) {
 	query := `
         mutation DeleteUser($id: String!) {
             deleteUser(id: $id) {
@@ -227,22 +238,22 @@ func (c *GraphQLClient) DeleteUser(userId string) (*db.User, time.Duration, erro
 		"id": userId,
 	}
 
-	data, time, err := c.MakeJSONRequest(query, variables)
+	data, headers, time, err := c.MakeJSONRequest(query, variables)
 	if err != nil {
-		return nil, time, err
+		return nil, headers, time, err
 	}
 
 	var result struct {
 		DeleteUser db.User `json:"deleteUser"`
 	}
 	if err := json.Unmarshal(data, &result); err != nil {
-		return nil, time, err
+		return nil, headers, time, err
 	}
 
-	return &result.DeleteUser, time, nil
+	return &result.DeleteUser, headers, time, nil
 }
 
-func (c *GraphQLClient) CreateRandomTodo(userId string) (*db.Todo, time.Duration, error) {
+func (c *GraphQLClient) CreateRandomTodo(userId string) (*db.Todo, map[string]interface{}, time.Duration, error) {
 	query := `
         mutation CreateTodo($text: String!, $userId: String!) {
             createTodo(params: {text: $text, userId: $userId}) {
@@ -275,22 +286,22 @@ func (c *GraphQLClient) CreateRandomTodo(userId string) (*db.Todo, time.Duration
 		"userId": userId, // Replace with actual user ID
 	}
 
-	data, time, err := c.MakeJSONRequest(query, variables)
+	data, headers, time, err := c.MakeJSONRequest(query, variables)
 	if err != nil {
-		return nil, time, err
+		return nil, headers, time, err
 	}
 
 	var result struct {
 		CreateTodo db.Todo `json:"createTodo"`
 	}
 	if err := json.Unmarshal(data, &result); err != nil {
-		return nil, time, err
+		return nil, headers, time, err
 	}
 
-	return &result.CreateTodo, time, nil
+	return &result.CreateTodo, headers, time, nil
 }
 
-func (c *GraphQLClient) MarkTodoAsDone(todoId string) (*db.Todo, time.Duration, error) {
+func (c *GraphQLClient) MarkTodoAsDone(todoId string) (*db.Todo, map[string]interface{}, time.Duration, error) {
 	query := `
         mutation MarkAsDone($id: String!) {
             markAsDone(id: $id) {
@@ -321,22 +332,22 @@ func (c *GraphQLClient) MarkTodoAsDone(todoId string) (*db.Todo, time.Duration, 
 		"id": todoId, // Replace with actual user ID
 	}
 
-	data, time, err := c.MakeJSONRequest(query, variables)
+	data, headers, time, err := c.MakeJSONRequest(query, variables)
 	if err != nil {
-		return nil, time, err
+		return nil, headers, time, err
 	}
 
 	var result struct {
 		MarkAsDone db.Todo `json:"markAsDone"`
 	}
 	if err := json.Unmarshal(data, &result); err != nil {
-		return nil, time, err
+		return nil, headers, time, err
 	}
 
-	return &result.MarkAsDone, time, nil
+	return &result.MarkAsDone, headers, time, nil
 }
 
-func (c *GraphQLClient) MarkTodoAsUnDone(todoId string) (*db.Todo, time.Duration, error) {
+func (c *GraphQLClient) MarkTodoAsUnDone(todoId string) (*db.Todo, map[string]interface{}, time.Duration, error) {
 	query := `
         mutation MarkAsUndone($id: String!) {
             markAsUndone(id: $id) {
@@ -367,22 +378,22 @@ func (c *GraphQLClient) MarkTodoAsUnDone(todoId string) (*db.Todo, time.Duration
 		"id": todoId, // Replace with actual user ID
 	}
 
-	data, time, err := c.MakeJSONRequest(query, variables)
+	data, headers, time, err := c.MakeJSONRequest(query, variables)
 	if err != nil {
-		return nil, time, err
+		return nil, headers, time, err
 	}
 
 	var result struct {
 		MarkAsUndone db.Todo `json:"markAsUndone"`
 	}
 	if err := json.Unmarshal(data, &result); err != nil {
-		return nil, time, err
+		return nil, headers, time, err
 	}
 
-	return &result.MarkAsUndone, time, nil
+	return &result.MarkAsUndone, headers, time, nil
 }
 
-func (c *GraphQLClient) DeleteTodo(todoId string) (*db.Todo, time.Duration, error) {
+func (c *GraphQLClient) DeleteTodo(todoId string) (*db.Todo, map[string]interface{}, time.Duration, error) {
 	query := `
         mutation DeleteTodo($id: String!) {
             deleteTodo(id: $id) {
@@ -413,22 +424,22 @@ func (c *GraphQLClient) DeleteTodo(todoId string) (*db.Todo, time.Duration, erro
 		"id": todoId, // Replace with actual user ID
 	}
 
-	data, time, err := c.MakeJSONRequest(query, variables)
+	data, headers, time, err := c.MakeJSONRequest(query, variables)
 	if err != nil {
-		return nil, time, err
+		return nil, headers, time, err
 	}
 
 	var result struct {
 		DeleteTodo db.Todo `json:"deleteTodo"`
 	}
 	if err := json.Unmarshal(data, &result); err != nil {
-		return nil, time, err
+		return nil, headers, time, err
 	}
 
-	return &result.DeleteTodo, time, nil
+	return &result.DeleteTodo, headers, time, nil
 }
 
-func (c *GraphQLClient) PaginateUsers() ([]db.User, time.Duration, error) {
+func (c *GraphQLClient) PaginateUsers() ([]db.User, map[string]interface{}, time.Duration, error) {
 	query := `
         query PaginateUsers($query: String $page: Int, $perPage: Int) {
             users(query: $query, page: $page, perPage: $perPage) {
@@ -457,22 +468,22 @@ func (c *GraphQLClient) PaginateUsers() ([]db.User, time.Duration, error) {
 		"perPage": 100,
 	}
 
-	data, time, err := c.MakeJSONRequest(query, variables)
+	data, headers, time, err := c.MakeJSONRequest(query, variables)
 	if err != nil {
-		return nil, time, err
+		return nil, headers, time, err
 	}
 
 	var result struct {
 		Users []db.User `json:"users"`
 	}
 	if err := json.Unmarshal(data, &result); err != nil {
-		return nil, time, err
+		return nil, headers, time, err
 	}
 
-	return result.Users, time, nil
+	return result.Users, headers, time, nil
 }
 
-func (c *GraphQLClient) PaginateTodos() ([]db.Todo, time.Duration, error) {
+func (c *GraphQLClient) PaginateTodos() ([]db.Todo, map[string]interface{}, time.Duration, error) {
 	query := `
         query PaginateTodos($query: String $page: Int, $perPage: Int) {
             todos(query: $query, page: $page, perPage: $perPage) {
@@ -493,22 +504,22 @@ func (c *GraphQLClient) PaginateTodos() ([]db.Todo, time.Duration, error) {
 		"perPage": 100,
 	}
 
-	data, time, err := c.MakeJSONRequest(query, variables)
+	data, headers, time, err := c.MakeJSONRequest(query, variables)
 	if err != nil {
-		return nil, time, err
+		return nil, headers, time, err
 	}
 
 	var result struct {
 		Todos []db.Todo `json:"todos"`
 	}
 	if err := json.Unmarshal(data, &result); err != nil {
-		return nil, time, err
+		return nil, headers, time, err
 	}
 
-	return result.Todos, time, nil
+	return result.Todos, headers, time, nil
 }
 
-func (c *GraphQLClient) GetUserByID(userID string) (*db.User, time.Duration, error) {
+func (c *GraphQLClient) GetUserByID(userID string) (*db.User, map[string]interface{}, time.Duration, error) {
 	query := `
         query GetUserByID($id: String!) {
             user(id: $id) {
@@ -535,22 +546,22 @@ func (c *GraphQLClient) GetUserByID(userID string) (*db.User, time.Duration, err
 		"id": userID,
 	}
 
-	data, time, err := c.MakeJSONRequest(query, variables)
+	data, headers, time, err := c.MakeJSONRequest(query, variables)
 	if err != nil {
-		return nil, time, err
+		return nil, headers, time, err
 	}
 
 	var result struct {
 		User db.User `json:"user"`
 	}
 	if err := json.Unmarshal(data, &result); err != nil {
-		return nil, time, err
+		return nil, headers, time, err
 	}
 
-	return &result.User, time, nil
+	return &result.User, headers, time, nil
 }
 
-func (c *GraphQLClient) GetUserTodosByID(userID string) (*db.User, time.Duration, error) {
+func (c *GraphQLClient) GetUserTodosByID(userID string) (*db.User, map[string]interface{}, time.Duration, error) {
 	query := `
         query GetUserTodosByID($id: String!) {
             user(id: $id) {
@@ -580,22 +591,22 @@ func (c *GraphQLClient) GetUserTodosByID(userID string) (*db.User, time.Duration
 		"id": userID,
 	}
 
-	data, time, err := c.MakeJSONRequest(query, variables)
+	data, headers, time, err := c.MakeJSONRequest(query, variables)
 	if err != nil {
-		return nil, time, err
+		return nil, headers, time, err
 	}
 
 	var result struct {
 		User db.User `json:"user"`
 	}
 	if err := json.Unmarshal(data, &result); err != nil {
-		return nil, time, err
+		return nil, headers, time, err
 	}
 
-	return &result.User, time, nil
+	return &result.User, headers, time, nil
 }
 
-func (c *GraphQLClient) GetTodoByID(todoID string) (*db.Todo, time.Duration, error) {
+func (c *GraphQLClient) GetTodoByID(todoID string) (*db.Todo, map[string]interface{}, time.Duration, error) {
 	query := `
         query GetTodoByID($id: String!) {
             todo(id: $id) {
@@ -612,22 +623,22 @@ func (c *GraphQLClient) GetTodoByID(todoID string) (*db.Todo, time.Duration, err
 		"id": todoID,
 	}
 
-	data, time, err := c.MakeJSONRequest(query, variables)
+	data, headers, time, err := c.MakeJSONRequest(query, variables)
 	if err != nil {
-		return nil, time, err
+		return nil, headers, time, err
 	}
 
 	var result struct {
 		Todo db.Todo `json:"todo"`
 	}
 	if err := json.Unmarshal(data, &result); err != nil {
-		return nil, time, err
+		return nil, headers, time, err
 	}
 
-	return &result.Todo, time, nil
+	return &result.Todo, headers, time, nil
 }
 
-func (c *GraphQLClient) GetTodoByIDWithUser(todoID string) (*db.Todo, time.Duration, error) {
+func (c *GraphQLClient) GetTodoByIDWithUser(todoID string) (*db.Todo, map[string]interface{}, time.Duration, error) {
 	query := `
         query GetTodoByID($id: String!) {
             todo(id: $id) {
@@ -648,9 +659,9 @@ func (c *GraphQLClient) GetTodoByIDWithUser(todoID string) (*db.Todo, time.Durat
 		"id": todoID,
 	}
 
-	data, time, err := c.MakeJSONRequest(query, variables)
+	data, headers, time, err := c.MakeJSONRequest(query, variables)
 	if err != nil {
-		return nil, time, err
+		return nil, headers, time, err
 	}
 
 	var result struct {
@@ -658,13 +669,13 @@ func (c *GraphQLClient) GetTodoByIDWithUser(todoID string) (*db.Todo, time.Durat
 	}
 
 	if err := json.Unmarshal(data, &result); err != nil {
-		return nil, time, err
+		return nil, headers, time, err
 	}
 
-	return &result.Todo, time, nil
+	return &result.Todo, headers, time, nil
 }
 
-func (c *GraphQLClient) GetSystemDetails() (map[string]interface{}, time.Duration, error) {
+func (c *GraphQLClient) GetSystemDetails() (map[string]interface{}, map[string]interface{}, time.Duration, error) {
 	query := `
         query GetSystemDetails {
 						healthy
@@ -678,20 +689,20 @@ func (c *GraphQLClient) GetSystemDetails() (map[string]interface{}, time.Duratio
     `
 	variables := map[string]interface{}{}
 
-	data, time, err := c.MakeJSONRequest(query, variables)
+	data, headers, time, err := c.MakeJSONRequest(query, variables)
 	if err != nil {
-		return nil, time, err
+		return nil, headers, time, err
 	}
 
 	var result map[string]interface{}
 	if err := json.Unmarshal(data, &result); err != nil {
-		return nil, time, err
+		return nil, headers, time, err
 	}
 
-	return result, time, nil
+	return result, headers, time, nil
 }
 
-func (c *GraphQLClient) DeleteEverything() (bool, time.Duration, error) {
+func (c *GraphQLClient) DeleteEverything() (bool, map[string]interface{}, time.Duration, error) {
 
 	// return true, 0, nil
 	query := `
@@ -701,19 +712,19 @@ func (c *GraphQLClient) DeleteEverything() (bool, time.Duration, error) {
 	  `
 	variables := map[string]interface{}{}
 
-	data, time, err := c.MakeJSONRequest(query, variables)
+	data, headers, time, err := c.MakeJSONRequest(query, variables)
 	if err != nil {
-		return false, time, err
+		return false, headers, time, err
 	}
 
 	var result struct {
 		DeleteEverything bool `json:"deleteEverything"`
 	}
 	if err := json.Unmarshal(data, &result); err != nil {
-		return false, time, err
+		return false, headers, time, err
 	}
 
-	return result.DeleteEverything, time, nil
+	return result.DeleteEverything, headers, time, nil
 }
 
 func (c *GraphQLClient) UploadImage(filePath string) (map[string]interface{}, map[string]interface{}, time.Duration, error) {

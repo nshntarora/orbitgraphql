@@ -7,9 +7,10 @@ import (
 	"net/http"
 )
 
-func GetDebugHandler(Cache *graphcache.GraphCache, cfg *config.Config) http.HandlerFunc {
+func GetDebugHandler(cfg *config.Config) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		resp := Cache.Look()
+		cache := graphcache.NewGraphCacheWithOptions(GetCacheOptions(cfg, GetScopeValues(cfg, r)))
+		resp := cache.Look()
 		br, err := json.Marshal(resp)
 		if err != nil {
 			http.Error(w, "error marshalling response", http.StatusInternalServerError)

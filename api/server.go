@@ -14,18 +14,16 @@ type Server struct {
 	cfg        *config.Config
 }
 
-func NewGraphCache(cfg *config.Config) *graphcache.GraphCache {
-	return graphcache.NewGraphCache(cfg)
+func NewGraphCache(opts *graphcache.GraphCacheOptions) *graphcache.GraphCache {
+	return graphcache.NewGraphCacheWithOptions(opts)
 }
 
 func NewServer(cfg *config.Config) *Server {
-	cache := NewGraphCache(cfg)
 	return &Server{
-		cache: cache,
-		cfg:   cfg,
+		cfg: cfg,
 		httpServer: &http.Server{
 			Addr:    ":" + strconv.Itoa(cfg.Port),
-			Handler: handlers.GetHandlers(cache, cfg),
+			Handler: handlers.GetHandlers(cfg),
 		},
 	}
 }

@@ -15,7 +15,7 @@ const NUMBER_OF_USERS = 10
 func RunUsersOperations(t *testing.T, client *test_client.GraphQLClient) (time.Duration, error) {
 	totalTimeTaken := time.Duration(0)
 
-	deleted, tt, err := client.DeleteEverything()
+	deleted, _, tt, err := client.DeleteEverything()
 	if err != nil {
 		fmt.Println("error resetting database ", err)
 		return totalTimeTaken, err
@@ -31,7 +31,7 @@ func RunUsersOperations(t *testing.T, client *test_client.GraphQLClient) (time.D
 	// Create 5 users
 	createdUsers := []db.User{}
 	for i := 0; i < NUMBER_OF_USERS; i++ {
-		user, tt, err := client.CreateRandomUser()
+		user, _, tt, err := client.CreateRandomUser()
 		if err != nil {
 			fmt.Println("error creating user ", err)
 			return totalTimeTaken, err
@@ -45,7 +45,7 @@ func RunUsersOperations(t *testing.T, client *test_client.GraphQLClient) (time.D
 
 	// Paginate users
 	for i := 0; i < NUMBER_OF_USERS; i++ {
-		users, tt, err := client.PaginateUsers()
+		users, _, tt, err := client.PaginateUsers()
 		if err != nil {
 			fmt.Println("error paginating users ", err)
 			return totalTimeTaken, err
@@ -56,7 +56,7 @@ func RunUsersOperations(t *testing.T, client *test_client.GraphQLClient) (time.D
 		assert.Equal(t, createdUsers, users)
 	}
 
-	user, tt, err := client.CreateRandomUser()
+	user, _, tt, err := client.CreateRandomUser()
 	if err != nil {
 		fmt.Println("error creating user ", err)
 		return totalTimeTaken, err
@@ -66,7 +66,7 @@ func RunUsersOperations(t *testing.T, client *test_client.GraphQLClient) (time.D
 
 	client.FlushByType("User", "")
 
-	users, tt, err := client.PaginateUsers()
+	users, _, tt, err := client.PaginateUsers()
 	if err != nil {
 		fmt.Println("error paginating users ", err)
 		return totalTimeTaken, err
@@ -77,7 +77,7 @@ func RunUsersOperations(t *testing.T, client *test_client.GraphQLClient) (time.D
 
 	for i := 0; i < NUMBER_OF_USERS; i++ {
 
-		user, tt, err = client.GetUserByID(userIDToUpdate)
+		user, _, tt, err = client.GetUserByID(userIDToUpdate)
 		if err != nil {
 			fmt.Println("error fetching user", err)
 			return totalTimeTaken, err
@@ -89,7 +89,7 @@ func RunUsersOperations(t *testing.T, client *test_client.GraphQLClient) (time.D
 	}
 
 	// Update a user
-	user, tt, err = client.UpdateUser(userIDToUpdate, "Updated Name", "", "")
+	user, _, tt, err = client.UpdateUser(userIDToUpdate, "Updated Name", "", "")
 	if err != nil {
 		fmt.Println("error updating user ", err)
 		return totalTimeTaken, err
@@ -99,7 +99,7 @@ func RunUsersOperations(t *testing.T, client *test_client.GraphQLClient) (time.D
 	assert.Equal(t, "Updated Name", user.Name)
 
 	for i := 0; i < NUMBER_OF_USERS; i++ {
-		updatedUser, tt, err := client.GetUserByID(userIDToUpdate)
+		updatedUser, _, tt, err := client.GetUserByID(userIDToUpdate)
 		if err != nil {
 			fmt.Println("error fetching user ", err)
 			return totalTimeTaken, err
@@ -116,7 +116,7 @@ func RunUsersOperations(t *testing.T, client *test_client.GraphQLClient) (time.D
 }
 
 func TestAPICacheTestSuite(t *testing.T) {
-	client := test_client.NewGraphQLClient("http://localhost:9090/graphql", "http://localhost:9090")
+	client := test_client.NewGraphQLClient("http://localhost:9090/graphql", "http://localhost:9090", nil)
 	defer client.DeleteEverything()
 	defer client.FlushCache()
 	timeTaken, err := RunUsersOperations(t, client)
@@ -125,7 +125,7 @@ func TestAPICacheTestSuite(t *testing.T) {
 }
 
 func TestAPIDefaultTestSuite(t *testing.T) {
-	client := test_client.NewGraphQLClient("http://localhost:8080/graphql", "")
+	client := test_client.NewGraphQLClient("http://localhost:8080/graphql", "", nil)
 	defer client.DeleteEverything()
 	defer client.FlushCache()
 	timeTaken, err := RunUsersOperations(t, client)
@@ -134,18 +134,18 @@ func TestAPIDefaultTestSuite(t *testing.T) {
 }
 
 func TestAPIResponseConsistency(t *testing.T) {
-	cacheClient := test_client.NewGraphQLClient("http://localhost:9090/graphql", "http://localhost:9090")
+	cacheClient := test_client.NewGraphQLClient("http://localhost:9090/graphql", "http://localhost:9090", nil)
 	cacheClient.DeleteEverything()
 	cacheClient.FlushCache()
 
-	defaultClient := test_client.NewGraphQLClient("http://localhost:8080/graphql", "")
+	defaultClient := test_client.NewGraphQLClient("http://localhost:8080/graphql", "", nil)
 
 	// run all mutations, then run all queries on the cached api and the default API, then compare the responses. If the responses do not match, the test fails.
 
 	// Create 5 users
 	createdUsers := []db.User{}
 	for i := 0; i < NUMBER_OF_USERS; i++ {
-		user, _, err := cacheClient.CreateRandomUser()
+		user, _, _, err := cacheClient.CreateRandomUser()
 		assert.Nil(t, err)
 		createdUsers = append(createdUsers, *user)
 	}
@@ -155,7 +155,7 @@ func TestAPIResponseConsistency(t *testing.T) {
 	timeTakenForCacheClient := time.Duration(0)
 
 	for i := 0; i < NUMBER_OF_USERS; i++ {
-		users, tt, err := cacheClient.PaginateUsers()
+		users, _, tt, err := cacheClient.PaginateUsers()
 		assert.Nil(t, err)
 		cachedUsersResponses = append(cachedUsersResponses, users...)
 		timeTakenForCacheClient += tt
@@ -164,7 +164,7 @@ func TestAPIResponseConsistency(t *testing.T) {
 	defaultUserResponses := []db.User{}
 	timeTakenForDefaultClient := time.Duration(0)
 	for i := 0; i < NUMBER_OF_USERS; i++ {
-		users, tt, err := defaultClient.PaginateUsers()
+		users, _, tt, err := defaultClient.PaginateUsers()
 		assert.Nil(t, err)
 		defaultUserResponses = append(defaultUserResponses, users...)
 		timeTakenForDefaultClient += tt
@@ -180,7 +180,7 @@ func TestAPIResponseConsistency(t *testing.T) {
 	defaultSystemDetailsResponses := []map[string]interface{}{}
 	// get system details from cache client and default client
 	for i := 0; i < NUMBER_OF_USERS; i++ {
-		details, _, err := defaultClient.GetSystemDetails()
+		details, _, _, err := defaultClient.GetSystemDetails()
 		assert.NotNil(t, details)
 		assert.Nil(t, err)
 		defaultSystemDetailsResponses = append(defaultSystemDetailsResponses, details)
@@ -188,7 +188,7 @@ func TestAPIResponseConsistency(t *testing.T) {
 
 	// get system details from cache client and default client
 	for i := 0; i < NUMBER_OF_USERS; i++ {
-		details, _, err := cacheClient.GetSystemDetails()
+		details, _, _, err := cacheClient.GetSystemDetails()
 		assert.NotNil(t, details)
 		assert.Nil(t, err)
 		cachedSystemDetailsResponses = append(cachedSystemDetailsResponses, details)
@@ -199,29 +199,29 @@ func TestAPIResponseConsistency(t *testing.T) {
 }
 
 func TestWithTodoOperations(t *testing.T) {
-	client := test_client.NewGraphQLClient("http://localhost:9090/graphql", "http://localhost:9090")
+	client := test_client.NewGraphQLClient("http://localhost:9090/graphql", "http://localhost:9090", nil)
 	defer client.DeleteEverything()
 	defer client.FlushCache()
 
-	user, _, err := client.CreateRandomUser()
+	user, _, _, err := client.CreateRandomUser()
 	assert.Nil(t, err)
 
 	userID := user.ID.String()
 
 	for i := 0; i < 10; i++ {
-		todo, _, err := client.CreateRandomTodo(userID)
+		todo, _, _, err := client.CreateRandomTodo(userID)
 		assert.Nil(t, err)
 		assert.NotNil(t, todo)
 	}
 
-	todo, _, err := client.CreateRandomTodo(userID)
+	todo, _, _, err := client.CreateRandomTodo(userID)
 	assert.Nil(t, err)
 	assert.NotNil(t, todo)
 
 	todoID := todo.ID.String()
 
 	// Get the todo
-	todoResponse, _, err := client.GetTodoByID(todoID)
+	todoResponse, _, _, err := client.GetTodoByID(todoID)
 	assert.Nil(t, err)
 	assert.NotNil(t, todoResponse)
 
@@ -231,7 +231,7 @@ func TestWithTodoOperations(t *testing.T) {
 	assert.Equal(t, todo.Done, todoResponse.Done)
 
 	// Update the todo
-	todoResponse, _, err = client.MarkTodoAsDone(todoID)
+	todoResponse, _, _, err = client.MarkTodoAsDone(todoID)
 	assert.Nil(t, err)
 	assert.NotNil(t, todoResponse)
 
@@ -241,7 +241,7 @@ func TestWithTodoOperations(t *testing.T) {
 	assert.Equal(t, true, todoResponse.Done)
 
 	// get the todo again
-	todoResponse, _, err = client.GetTodoByID(todoID)
+	todoResponse, _, _, err = client.GetTodoByID(todoID)
 	assert.Nil(t, err)
 	assert.NotNil(t, todoResponse)
 
@@ -252,7 +252,7 @@ func TestWithTodoOperations(t *testing.T) {
 	assert.Nil(t, todoResponse.User)
 
 	// get the todo with user
-	todoResponse, _, err = client.GetTodoByIDWithUser(todoID)
+	todoResponse, _, _, err = client.GetTodoByIDWithUser(todoID)
 	assert.Nil(t, err)
 	assert.NotNil(t, todoResponse)
 
@@ -265,7 +265,7 @@ func TestWithTodoOperations(t *testing.T) {
 }
 
 func TestMultipartRequestsBypass(t *testing.T) {
-	client := test_client.NewGraphQLClient("http://localhost:9090/graphql", "http://localhost:9090")
+	client := test_client.NewGraphQLClient("http://localhost:9090/graphql", "http://localhost:9090", nil)
 
 	resp, headers, _, err := client.UploadImage("./logo.svg")
 	assert.Nil(t, err)
@@ -273,4 +273,52 @@ func TestMultipartRequestsBypass(t *testing.T) {
 	assert.NotNil(t, headers)
 
 	assert.Equal(t, "BYPASS", headers["X-Orbit-Cache"])
+}
+
+func TestGraphCacheScopeHeaders(t *testing.T) {
+
+	// create a graphql client with an authorization header
+	// send a few requests to the client and check if they get cache hits
+	// send a few requests to the client with a different authorization header and check if they get cache misses
+
+	client := test_client.NewGraphQLClient("http://localhost:9090/graphql", "http://localhost:9090", map[string]interface{}{
+		"Authorization": "Bearer 1234",
+	})
+	defer client.DeleteEverything()
+	defer client.FlushCache()
+
+	user, _, _, err := client.CreateRandomUser()
+	assert.Nil(t, err)
+	userID := user.ID.String()
+
+	// get the user once
+	user, headers, _, err := client.GetUserByID(userID)
+	assert.NotNil(t, user)
+	assert.Nil(t, err)
+	fmt.Println(headers)
+	assert.Equal(t, "MISS", headers["X-Orbit-Cache"])
+
+	for i := 0; i < 10; i++ {
+		// get the user multiple times
+		client.GetUserByID(userID)
+		fmt.Println(headers)
+	}
+
+	// get the user again
+	user, headers, _, err = client.GetUserByID(userID)
+	assert.NotNil(t, user)
+	assert.Nil(t, err)
+	fmt.Println(headers)
+	assert.Equal(t, "HIT", headers["X-Orbit-Cache"])
+
+	// create a new client with a different authorization header
+	client = test_client.NewGraphQLClient("http://localhost:9090/graphql", "http://localhost:9090", map[string]interface{}{
+		"Authorization": "Bearer 5678",
+	})
+
+	// get the user once
+	user, headers, _, err = client.GetUserByID(userID)
+	assert.NotNil(t, user)
+	assert.Nil(t, err)
+	assert.Equal(t, "MISS", headers["X-Orbit-Cache"])
 }

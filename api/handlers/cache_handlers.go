@@ -17,9 +17,9 @@ const CACHE_STATUS_BYPASS = "BYPASS"
 const CACHE_STATUS_HIT = "HIT"
 const CACHE_STATUS_MISS = "MISS"
 
-func GetCacheHandler(cache *graphcache.GraphCache, cfg *config.Config) http.HandlerFunc {
+func GetCacheHandler(cfg *config.Config) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
+		cache := graphcache.NewGraphCacheWithOptions(GetCacheOptions(cfg, GetScopeValues(cfg, r)))
 		w.Header().Add("Content-Type", "application/json")
 
 		// Create a new HTTP request with the same method, URL, and body as the original request

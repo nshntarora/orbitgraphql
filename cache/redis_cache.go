@@ -12,17 +12,23 @@ var ctx = context.Background()
 
 // RedisCache implements the Cache interface and uses Redis as the cache store
 type RedisCache struct {
-	cache *redis.Client
+	cache  *redis.Client
+	prefix string
 }
 
-func NewRedisCache(host, port string) Cache {
+func (c *RedisCache) Key(key string) string {
+	return c.prefix + key
+}
+
+func NewRedisCache(host, port, prefix string) Cache {
 	c := redis.NewClient(&redis.Options{
 		Addr:     host + ":" + port,
 		Password: "", // no password set
 		DB:       0,  // use default DB
 	})
 	return &RedisCache{
-		cache: c,
+		cache:  c,
+		prefix: prefix,
 	}
 }
 
@@ -31,21 +37,21 @@ func (c *RedisCache) Set(key string, value interface{}) error {
 	switch valueType.Kind() {
 	case reflect.Map:
 		br, _ := json.Marshal(value)
-		c.cache.Set(ctx, key, string(br), 0)
-		c.cache.Set(ctx, key+"_type", "reflect.Map", 0)
+		c.cache.Set(ctx, c.Key(key), string(br), 0)
+		c.cache.Set(ctx, c.Key(key+"_type"), "reflect.Map", 0)
 	case reflect.Slice:
 		br, _ := json.Marshal(value)
-		c.cache.Set(ctx, key, string(br), 0)
-		c.cache.Set(ctx, key+"_type", "reflect.Slice", 0)
+		c.cache.Set(ctx, c.Key(key), string(br), 0)
+		c.cache.Set(ctx, c.Key(key+"_type"), "reflect.Slice", 0)
 	default:
-		c.cache.Set(ctx, key, value, 0)
+		c.cache.Set(ctx, c.Key(key), value, 0)
 	}
 	return nil
 }
 
 func (c *RedisCache) Get(key string) (interface{}, error) {
-	typeValue, _ := c.cache.Get(ctx, key+"_type").Result()
-	val, err := c.cache.Get(ctx, key).Result()
+	typeValue, _ := c.cache.Get(ctx, c.Key(key+"_type")).Result()
+	val, err := c.cache.Get(ctx, c.Key(key)).Result()
 	if err != nil {
 		return nil, err
 	}
@@ -65,12 +71,12 @@ func (c *RedisCache) Get(key string) (interface{}, error) {
 }
 
 func (c *RedisCache) Del(key string) error {
-	c.cache.Del(ctx, key)
+	c.cache.Del(ctx, c.Key(key))
 	return nil
 }
 
 func (c *RedisCache) Exists(key string) (bool, error) {
-	val, err := c.cache.Exists(ctx, key).Result()
+	val, err := c.cache.Exists(ctx, c.Key(key)).Result()
 	if err != nil {
 		return false, err
 	}
@@ -95,7 +101,7 @@ func (c *RedisCache) Flush() error {
 }
 
 func (c *RedisCache) DeleteByPrefix(prefix string) error {
-	allKeys := c.cache.Keys(ctx, prefix+"*")
+	allKeys := c.cache.Keys(ctx, c.Key(prefix+"*"))
 	if allKeys == nil {
 		return nil
 	}
