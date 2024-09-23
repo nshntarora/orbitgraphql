@@ -326,21 +326,12 @@ func TestGraphCacheScopeHeaders(t *testing.T) {
 	user, headers, _, err := client.GetUserByID(userID)
 	assert.NotNil(t, user)
 	assert.Nil(t, err)
-	fmt.Println(headers)
 	assert.Equal(t, "MISS", headers["X-Orbit-Cache"])
-
-	// for i := 0; i < 10; i++ {
-	// 	// get the user multiple times
-	// 	client.GetUserByID(userID)
-	// 	fmt.Println(headers)
-	// 	time.Sleep(1 * time.Second)
-	// }
 
 	// get the user again
 	user, headers, _, err = client.GetUserByID(userID)
 	assert.NotNil(t, user)
 	assert.Nil(t, err)
-	fmt.Println(headers)
 	assert.Equal(t, "HIT", headers["X-Orbit-Cache"])
 
 	// create a new client with a different authorization header

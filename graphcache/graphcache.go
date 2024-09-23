@@ -17,15 +17,13 @@ const DEFAULT_CACHE_PREFIX = "orbit::"
 
 // GraphCache is a struct that holds the cache stores for the GraphQL cache
 type GraphCache struct {
-	prefix           string
-	cacheStore       cache.Cache
-	recordCacheStore cache.Cache
-	queryCacheStore  cache.Cache
+	prefix          string
+	cacheStore      cache.Cache
+	queryCacheStore cache.Cache
 }
 type GraphCacheOptions struct {
 	QueryStore  cache.Cache
 	ObjectStore cache.Cache
-	RecordStore cache.Cache
 	Prefix      string
 }
 
@@ -37,17 +35,15 @@ const CacheBackendInMemory CacheBackend = "in_memory"
 func NewGraphCache() *GraphCache {
 	return NewGraphCacheWithOptions(&GraphCacheOptions{
 		ObjectStore: cache.NewInMemoryCache(),
-		RecordStore: cache.NewInMemoryCache(),
 		QueryStore:  cache.NewInMemoryCache(),
 	})
 }
 
 func NewGraphCacheWithOptions(opts *GraphCacheOptions) *GraphCache {
 	return &GraphCache{
-		prefix:           opts.Prefix,
-		cacheStore:       opts.ObjectStore,
-		recordCacheStore: opts.RecordStore,
-		queryCacheStore:  opts.QueryStore,
+		prefix:          opts.Prefix,
+		cacheStore:      opts.ObjectStore,
+		queryCacheStore: opts.QueryStore,
 	}
 }
 
@@ -325,22 +321,12 @@ func (gc *GraphCache) CacheObject(field string, object map[string]interface{}, p
 		id := object["id"].(string)
 		cacheKey := typename + ":" + id
 		gc.cacheStore.Set(gc.Key(cacheKey), object)
-
-		for key, value := range object {
-			gc.recordCacheStore.Set(gc.Key(cacheKey+":"+key), value)
-		}
-
 		return gc.Key(cacheKey)
 	} else if utils.StringArrayContainsString(objectKeys, "__typename") && !utils.StringArrayContainsString(objectKeys, "id") && parent != nil && utils.StringArrayContainsString(parentKeys, "id") && utils.StringArrayContainsString(parentKeys, "__typename") {
 		typename := parent["__typename"].(string)
 		parentID := parent["id"].(string)
 		cacheKey := typename + ":" + parentID + ":" + field
 		gc.cacheStore.Set(gc.Key(cacheKey), object)
-
-		for key, value := range object {
-			gc.recordCacheStore.Set(gc.Key(cacheKey+":"+key), value)
-		}
-
 		return gc.Key(cacheKey)
 	}
 
@@ -571,22 +557,12 @@ func (gc *GraphCache) InvalidateCacheObject(field string, object map[string]inte
 		id := object["id"].(string)
 		cacheKey := typename + ":" + id
 		gc.cacheStore.DeleteByPrefix(gc.Key(cacheKey))
-
-		for key := range object {
-			gc.recordCacheStore.Del(gc.Key(cacheKey + ":" + key))
-		}
-
 		return gc.Key(cacheKey)
 	} else if utils.StringArrayContainsString(objectKeys, "__typename") && !utils.StringArrayContainsString(objectKeys, "id") && parent != nil && utils.StringArrayContainsString(parentKeys, "id") && utils.StringArrayContainsString(parentKeys, "__typename") {
 		typename := parent["__typename"].(string)
 		parentID := parent["id"].(string)
 		cacheKey := typename + ":" + parentID + ":" + field
 		gc.cacheStore.DeleteByPrefix(gc.Key(cacheKey))
-
-		for key := range object {
-			gc.recordCacheStore.Del(gc.Key(cacheKey + ":" + key))
-		}
-
 		return gc.Key(cacheKey)
 	}
 
@@ -595,18 +571,15 @@ func (gc *GraphCache) InvalidateCacheObject(field string, object map[string]inte
 
 func (gc *GraphCache) Debug() {
 	gc.cacheStore.Debug("cacheStore")
-	gc.recordCacheStore.Debug("recordCacheStore")
 	gc.queryCacheStore.Debug("queryCacheStore")
 }
 
 func (gc *GraphCache) Look() map[string]interface{} {
 	output := make(map[string]interface{})
 	cacheMap, _ := gc.cacheStore.Map()
-	recordCacheMap, _ := gc.recordCacheStore.Map()
 	queryCacheMap, _ := gc.queryCacheStore.Map()
 
 	output["cacheStore"] = cacheMap
-	output["recordCacheStore"] = recordCacheMap
 	output["queryCacheStore"] = queryCacheMap
 
 	return output
@@ -614,12 +587,10 @@ func (gc *GraphCache) Look() map[string]interface{} {
 
 func (gc *GraphCache) Flush() {
 	gc.cacheStore.Flush()
-	gc.recordCacheStore.Flush()
 	gc.queryCacheStore.Flush()
 }
 
 func (gc *GraphCache) FlushByType(typeName string, id string) {
 	gc.cacheStore.DeleteByPrefix(gc.Key(typeName + ":" + id))
-	gc.recordCacheStore.DeleteByPrefix(gc.Key(typeName + ":" + id))
 	gc.queryCacheStore.DeleteByPrefix(gc.Key(typeName + ":" + id))
 }

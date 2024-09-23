@@ -14,7 +14,6 @@ import (
 )
 
 var QueryStore *cache.Cache
-var RecordStore *cache.Cache
 var ObjectStore *cache.Cache
 
 func GetHandlers(cfg *config.Config) *http.ServeMux {
@@ -38,10 +37,6 @@ func GetCacheOptions(cfg *config.Config, values []interface{}) *graphcache.Graph
 		qs := GetNewCacheStore(cfg)
 		QueryStore = &qs
 	}
-	if RecordStore == nil {
-		rs := GetNewCacheStore(cfg)
-		RecordStore = &rs
-	}
 	if ObjectStore == nil {
 		os := GetNewCacheStore(cfg)
 		ObjectStore = &os
@@ -54,7 +49,6 @@ func GetCacheOptions(cfg *config.Config, values []interface{}) *graphcache.Graph
 	valueHash := base64.StdEncoding.EncodeToString([]byte(strings.Join(valueStr, "::")))
 
 	return &graphcache.GraphCacheOptions{
-		RecordStore: *RecordStore,
 		QueryStore:  *QueryStore,
 		ObjectStore: *ObjectStore,
 		Prefix:      valueHash,
