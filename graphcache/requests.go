@@ -1,6 +1,12 @@
 package graphcache
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"regexp"
+	"strings"
+)
+
+var operationNameRegex = regexp.MustCompile(`(?m)(query|mutation|subscription)\s+(\w+)\s*`)
 
 type GraphQLRequest struct {
 	OperationName string                 `json:"operationName"`
@@ -10,8 +16,9 @@ type GraphQLRequest struct {
 
 func (gr *GraphQLRequest) Map() map[string]interface{} {
 	return map[string]interface{}{
-		"query":     gr.Query,
-		"variables": gr.Variables,
+		"query":         gr.Query,
+		"variables":     gr.Variables,
+		"operationName": gr.OperationName,
 	}
 }
 
@@ -22,4 +29,12 @@ func (gr *GraphQLRequest) Bytes() []byte {
 
 func (gr *GraphQLRequest) FromBytes(req []byte) {
 	json.Unmarshal(req, gr)
+	// if the request doesn't contain an operation name, try to extract it from the query
+	if gr.OperationName == "" && len(gr.Query) > 0 {
+		m2 := operationNameRegex.FindString(gr.Query)
+		operationNames := strings.Split(m2, " ")
+		if len(operationNames) > 1 {
+			gr.OperationName = strings.TrimSpace(operationNames[1])
+		}
+	}
 }
