@@ -23,7 +23,7 @@ func main() {
 	fmt.Println("🛠️ initializing configuration...")
 	cfg := config.NewConfig()
 	fmt.Println("🛠️ configuration initalized")
-	fmt.Println("⚙️ configuration: ", "cache_backend=", cfg.CacheBackend, "cache_header_name=", cfg.CacheHeaderName, "origin=", cfg.Origin, "port=", cfg.Port, "scope_headers=", cfg.ScopeHeaders, "primary_key_field=", cfg.PrimaryKeyField, "handlers=", cfg.Handlers, "log_level=", cfg.LogLevel, "log_format=", cfg.LogFormat)
+	fmt.Println("⚙️ configuration: ", "cache_backend=", cfg.CacheBackend, "cache_header_name=", cfg.CacheHeaderName, "origin=", cfg.Origin, "port=", cfg.Port, "scope_headers=", cfg.ScopeHeaders, "primary_key_field=", cfg.PrimaryKeyField, "log_level=", cfg.LogLevel, "log_format=", cfg.LogFormat, "redis_host=", cfg.RedisHost, "redis_port=", cfg.RedisPort, "cache_ttl=", cfg.CacheTTL, "handlers_graphql_path=", cfg.HandlersGraphQLPath, "handlers_flush_all_path=", cfg.HandlersFlushAllPath, "handlers_flush_by_type_path=", cfg.HandlersFlushByTypePath, "handlers_debug_path=", cfg.HandlersDebugPath, "handlers_health_path=", cfg.HandlersHealthPath)
 
 	logger.Configure(&logger.Config{
 		Format: string(cfg.LogFormat),

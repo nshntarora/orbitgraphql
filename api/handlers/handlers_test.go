@@ -40,10 +40,8 @@ func TestGetCacheOptionsWithRedis(t *testing.T) {
 	cfg := &config.Config{
 		CacheBackend:    "redis",
 		PrimaryKeyField: "id",
-		Redis: config.RedisConfig{
-			Host: "localhost",
-			Port: 6379,
-		},
+		RedisHost:       "localhost",
+		RedisPort:       6379,
 	}
 
 	// Test values

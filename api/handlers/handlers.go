@@ -18,16 +18,16 @@ var ObjectStore *cache.Cache
 
 func GetHandlers(cfg *config.Config) *http.ServeMux {
 	api := http.NewServeMux()
-	api.Handle(cfg.Handlers.DebugPath, GetDebugHandler(cfg))
-	api.Handle(cfg.Handlers.FlushAllPath, GetFlushCacheHandler(cfg))
-	api.Handle(cfg.Handlers.FlushByTypePath, GetFlushCacheByTypeHandler(cfg))
-	api.Handle(cfg.Handlers.GraphQLPath, GetCacheHandler(cfg))
+	api.Handle(cfg.HandlersDebugPath, GetDebugHandler(cfg))
+	api.Handle(cfg.HandlersFlushAllPath, GetFlushCacheHandler(cfg))
+	api.Handle(cfg.HandlersFlushByTypePath, GetFlushCacheByTypeHandler(cfg))
+	api.Handle(cfg.HandlersGraphQLPath, GetCacheHandler(cfg))
 	return api
 }
 
 func GetNewCacheStore(cfg *config.Config) cache.Cache {
 	if cfg.CacheBackend == "redis" {
-		cache.NewRedisCache(cfg.Redis.Host, strconv.Itoa(cfg.Redis.Port), cfg.CacheTTL)
+		cache.NewRedisCache(cfg.RedisHost, strconv.Itoa(cfg.RedisPort), cfg.CacheTTL)
 	}
 	return cache.NewInMemoryCache(cfg.CacheTTL)
 }
