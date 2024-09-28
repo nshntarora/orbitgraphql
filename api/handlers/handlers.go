@@ -58,7 +58,12 @@ func GetCacheOptions(cfg *config.Config, values []interface{}) *graphcache.Graph
 
 func GetScopeValues(cfg *config.Config, r *http.Request) []interface{} {
 	values := make([]interface{}, 0)
-	for _, header := range cfg.ScopeHeaders {
+	splittedHeaderNames := strings.Split(cfg.ScopeHeaders, ",")
+	headerNames := make([]string, 0)
+	for _, header := range splittedHeaderNames {
+		headerNames = append(headerNames, strings.TrimSpace(header))
+	}
+	for _, header := range headerNames {
 		if header != "" {
 			values = append(values, r.Header.Get(header))
 		}

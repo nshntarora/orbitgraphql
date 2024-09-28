@@ -10,13 +10,13 @@ import (
 )
 
 type Config struct {
-	Origin          string   `toml:"origin" envconfig:"ORBIT_ORIGIN"`
-	Port            int      `toml:"port" envconfig:"ORBIT_PORT"`
-	CacheBackend    string   `toml:"cache_backend" envconfig:"ORBIT_CACHE_BACKEND"`
-	CacheHeaderName string   `toml:"cache_header_name" envconfig:"ORBIT_CACHE_HEADER_NAME"`
-	CacheTTL        int      `toml:"cache_ttl" envconfig:"ORBIT_CACHE_TTL"`
-	ScopeHeaders    []string `toml:"scope_headers" envconfig:"ORBIT_SCOPE_HEADERS"`
-	PrimaryKeyField string   `toml:"primary_key_field" envconfig:"ORBIT_PRIMARY_KEY_FIELD"`
+	Origin          string `toml:"origin" envconfig:"ORBIT_ORIGIN"`
+	Port            int    `toml:"port" envconfig:"ORBIT_PORT"`
+	CacheBackend    string `toml:"cache_backend" envconfig:"ORBIT_CACHE_BACKEND"`
+	CacheHeaderName string `toml:"cache_header_name" envconfig:"ORBIT_CACHE_HEADER_NAME"`
+	CacheTTL        int    `toml:"cache_ttl" envconfig:"ORBIT_CACHE_TTL"`
+	ScopeHeaders    string `toml:"scope_headers" envconfig:"ORBIT_SCOPE_HEADERS"`
+	PrimaryKeyField string `toml:"primary_key_field" envconfig:"ORBIT_PRIMARY_KEY_FIELD"`
 
 	// Handlers configuration
 	HandlersGraphQLPath     string `toml:"handlers_graphql_path" envconfig:"ORBIT_HANDLERS_GRAPHQL_PATH"`
@@ -68,6 +68,14 @@ func NewConfig() *Config {
 
 	if cfg.Port == 0 {
 		cfg.Port = 9090
+	}
+
+	if cfg.ScopeHeaders == "" {
+		cfg.ScopeHeaders = "Authorization"
+	}
+
+	if cfg.PrimaryKeyField == "" {
+		cfg.PrimaryKeyField = "id"
 	}
 
 	if cfg.HandlersGraphQLPath == "" {
