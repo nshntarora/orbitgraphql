@@ -4,7 +4,7 @@
       fill: white;
     }
     #text {
-      fill: white;
+      fill: black;
     }
     @media (prefers-color-scheme: dark) {
       rect {
