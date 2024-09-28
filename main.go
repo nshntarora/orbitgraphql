@@ -23,7 +23,8 @@ func main() {
 	fmt.Println("🛠️ initializing configuration...")
 	cfg := config.NewConfig()
 	fmt.Println("🛠️ configuration initalized")
-	fmt.Println("⚙️ configuration: ", "cache_backend=", cfg.CacheBackend, "cache_header_name=", cfg.CacheHeaderName, "origin=", cfg.Origin, "port=", cfg.Port, "scope_headers=", cfg.ScopeHeaders, "primary_key_field=", cfg.PrimaryKeyField, "log_level=", cfg.LogLevel, "log_format=", cfg.LogFormat, "redis_host=", cfg.RedisHost, "redis_port=", cfg.RedisPort, "cache_ttl=", cfg.CacheTTL, "handlers_graphql_path=", cfg.HandlersGraphQLPath, "handlers_flush_all_path=", cfg.HandlersFlushAllPath, "handlers_flush_by_type_path=", cfg.HandlersFlushByTypePath, "handlers_debug_path=", cfg.HandlersDebugPath, "handlers_health_path=", cfg.HandlersHealthPath)
+	fmt.Println("⚙️ configuration: ")
+	fmt.Print("→ cache_backend=", cfg.CacheBackend, "\n→ cache_header_name=", cfg.CacheHeaderName, "\n→ origin=", cfg.Origin, "\n→ port=", cfg.Port, "\n→ scope_headers=", cfg.ScopeHeaders, "\n→ primary_key_field=", cfg.PrimaryKeyField, "\n→ log_level=", cfg.LogLevel, "\n→ log_format=", cfg.LogFormat, "\n→ redis_host=", cfg.RedisHost, "\n→ redis_port=", cfg.RedisPort, "\n→ cache_ttl=", cfg.CacheTTL, "\n→ handlers_graphql_path=", cfg.HandlersGraphQLPath, "\n→ handlers_flush_all_path=", cfg.HandlersFlushAllPath, "\n→ handlers_flush_by_type_path=", cfg.HandlersFlushByTypePath, "\n→ handlers_debug_path=", cfg.HandlersDebugPath, "\n→ handlers_health_path=", cfg.HandlersHealthPath, "\n\n")
 
 	logger.Configure(&logger.Config{
 		Format: string(cfg.LogFormat),

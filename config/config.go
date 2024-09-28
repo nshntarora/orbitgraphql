@@ -46,6 +46,30 @@ func NewConfig() *Config {
 	// then override the configuration from environment variables
 	OverrideConfigFromEnv(&cfg)
 
+	if cfg.Origin == "" {
+		log.Print("origin url is required, you can configure it in the config.toml file or pass it as an environment variable ORBIT_ORIGIN=http://localhost:8080/graphql")
+		os.Exit(1)
+	}
+
+	if cfg.CacheBackend == "" {
+		cfg.CacheBackend = "in_memory"
+	}
+
+	if cfg.CacheBackend == "redis" {
+		if cfg.RedisHost == "" {
+			log.Print("redis host is required when using redis cache backend")
+			os.Exit(1)
+		}
+		if cfg.RedisPort == 0 {
+			log.Print("redis port is required when using redis cache backend")
+			os.Exit(1)
+		}
+	}
+
+	if cfg.Port == 0 {
+		cfg.Port = 9090
+	}
+
 	if cfg.HandlersGraphQLPath == "" {
 		cfg.HandlersGraphQLPath = "/graphql"
 	}
