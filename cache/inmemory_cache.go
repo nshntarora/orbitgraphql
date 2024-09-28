@@ -3,7 +3,7 @@ package cache
 import (
 	"encoding/json"
 	"errors"
-	"graphql_cache/utils/file_utils"
+	"orbitgraphql/utils/file_utils"
 	"regexp"
 	"strings"
 	"sync"

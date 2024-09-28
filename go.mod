@@ -1,4 +1,4 @@
-module graphql_cache
+module orbitgraphql
 
 go 1.22
 

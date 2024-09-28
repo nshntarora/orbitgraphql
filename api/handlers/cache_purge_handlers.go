@@ -3,10 +3,10 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"graphql_cache/config"
-	"graphql_cache/graphcache"
 	"io"
 	"net/http"
+	"orbitgraphql/config"
+	"orbitgraphql/graphcache"
 )
 
 type FlushCacheByTypeRequest struct {

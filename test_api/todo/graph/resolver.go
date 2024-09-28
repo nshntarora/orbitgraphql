@@ -1,7 +1,7 @@
 package graph
 
 import (
-	"graphql_cache/test_api/todo/db"
+	"orbitgraphql/test_api/todo/db"
 )
 
 // This file will not be regenerated automatically.

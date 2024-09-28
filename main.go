@@ -2,10 +2,10 @@ package main
 
 import (
 	"fmt"
-	"graphql_cache/api"
-	"graphql_cache/config"
-	"graphql_cache/logger"
 	"log"
+	"orbitgraphql/api"
+	"orbitgraphql/config"
+	"orbitgraphql/logger"
 	"strconv"
 )
 

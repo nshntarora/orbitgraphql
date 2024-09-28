@@ -5,9 +5,9 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"graphql_cache/cache"
-	"graphql_cache/logger"
-	"graphql_cache/utils"
+	"orbitgraphql/cache"
+	"orbitgraphql/logger"
+	"orbitgraphql/utils"
 	"reflect"
 	"strings"
 

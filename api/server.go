@@ -1,9 +1,9 @@
 package api
 
 import (
-	"graphql_cache/api/handlers"
-	"graphql_cache/config"
 	"net/http"
+	"orbitgraphql/api/handlers"
+	"orbitgraphql/config"
 	"strconv"
 )
 

@@ -5,12 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"graphql_cache/config"
-	"graphql_cache/graphcache"
-	"graphql_cache/logger"
 	"io"
 	"net/http"
 	"net/url"
+	"orbitgraphql/config"
+	"orbitgraphql/graphcache"
+	"orbitgraphql/logger"
 	"time"
 )
 

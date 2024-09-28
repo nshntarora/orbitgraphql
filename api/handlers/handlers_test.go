@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"graphql_cache/config"
+	"orbitgraphql/config"
 	"testing"
 
 	"github.com/stretchr/testify/assert"

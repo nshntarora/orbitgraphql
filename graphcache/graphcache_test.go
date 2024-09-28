@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"graphql_cache/cache"
+	"orbitgraphql/cache"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/vektah/gqlparser/ast"

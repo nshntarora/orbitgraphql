@@ -3,9 +3,9 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"graphql_cache/config"
-	"graphql_cache/graphcache"
 	"net/http"
+	"orbitgraphql/config"
+	"orbitgraphql/graphcache"
 )
 
 func GetDebugHandler(cfg *config.Config) http.HandlerFunc {

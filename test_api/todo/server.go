@@ -3,10 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
-	"graphql_cache/test_api/todo/db"
-	"graphql_cache/test_api/todo/graph"
 	"log"
 	"net/http"
+	"orbitgraphql/test_api/todo/db"
+	"orbitgraphql/test_api/todo/graph"
 	"os"
 	"time"
 

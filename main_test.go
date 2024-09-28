@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	"graphql_cache/test_api/todo/db"
-	"graphql_cache/test_client"
+	"orbitgraphql/test_api/todo/db"
+	"orbitgraphql/test_client"
 	"testing"
 	"time"
 
