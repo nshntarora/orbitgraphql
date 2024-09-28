@@ -19,6 +19,7 @@ type InMemoryCache struct {
 
 func NewInMemoryCache(ttl int) *InMemoryCache {
 	cache := &InMemoryCache{
+		mu:         sync.Mutex{},
 		data:       make(map[string]interface{}),
 		expiration: make(map[string]*time.Time),
 		ttl:        ttl,
@@ -59,8 +60,6 @@ func (c *InMemoryCache) Get(key string) (interface{}, error) {
 }
 
 func (c *InMemoryCache) Del(key string) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
 	c.Set(c.Key(key), nil)
 	return nil
 }
@@ -76,8 +75,6 @@ func (c *InMemoryCache) Exists(key string) (bool, error) {
 }
 
 func (c *InMemoryCache) Map() (map[string]interface{}, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
 	copy := make(map[string]interface{})
 	now := time.Now()
 	for k, v := range c.data {
@@ -89,21 +86,14 @@ func (c *InMemoryCache) Map() (map[string]interface{}, error) {
 }
 
 func (c *InMemoryCache) JSON() ([]byte, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	copy := make(map[string]interface{})
-	now := time.Now()
-	for k, v := range c.data {
-		if expiration, exists := c.expiration[k]; exists && expiration != nil && now.Before(*expiration) {
-			copy[k] = v
-		}
+	copy, err := c.Map()
+	if err != nil {
+		return nil, err
 	}
 	return json.Marshal(copy)
 }
 
 func (c *InMemoryCache) Debug(identifier string) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
 	f := file_utils.NewFile("../" + identifier + ".cache.json")
 	defer f.Close()
 	jsonContent, _ := c.JSON()
@@ -120,8 +110,6 @@ func (c *InMemoryCache) Flush() error {
 }
 
 func (c *InMemoryCache) DeleteByPrefix(prefix string) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
 	var re = regexp.MustCompile(`(?m)` + strings.ReplaceAll(c.Key(prefix), "*", ".*"))
 	for k := range c.data {
 		if re.Match([]byte(k)) {
@@ -138,8 +126,7 @@ func (c *InMemoryCache) cleanup() {
 		now := time.Now()
 		for key, expiration := range c.expiration {
 			if expiration != nil && now.After(*expiration) {
-				delete(c.data, key)
-				delete(c.expiration, key)
+				c.Del(key)
 			}
 		}
 		c.mu.Unlock()

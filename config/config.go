@@ -8,6 +8,13 @@ import (
 	"github.com/pelletier/go-toml/v2"
 )
 
+type LogFormat string
+
+const (
+	JSON LogFormat = "json"
+	TEXT LogFormat = "text"
+)
+
 type HandlersConfig struct {
 	GraphQLPath     string `toml:"graphql_path"`
 	FlushAllPath    string `toml:"flush_all_path"`
@@ -31,6 +38,8 @@ type Config struct {
 	PrimaryKeyField string         `toml:"primary_key_field"`
 	Handlers        HandlersConfig `toml:"handlers"`
 	Redis           RedisConfig    `toml:"redis"`
+	LogLevel        string         `toml:"log_level"`
+	LogFormat       LogFormat      `toml:"log_format"`
 }
 
 var CONFIG_FILE = "./config.toml"
@@ -89,6 +98,14 @@ func NewConfig() *Config {
 	if cfg.CacheTTL == 0 {
 		// default cache TTL is 1 hour
 		cfg.CacheTTL = 3600
+	}
+
+	if cfg.LogLevel == "" {
+		cfg.LogLevel = "info"
+	}
+
+	if cfg.LogFormat == "" {
+		cfg.LogFormat = TEXT
 	}
 
 	return &cfg

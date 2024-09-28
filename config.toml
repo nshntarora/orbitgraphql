@@ -30,6 +30,12 @@ scope_headers=[ "Authorization", "X-API-Key" ]
 primary_key_field="id"
 
 
+# log format is the format you want the system to log in, supported values are "json" and "text", it defaults to "text"
+log_format="text"
+
+# log level is the level of logging you want to see, supported values are "debug", "info", "warn", "error", it defaults to "info"
+log_level="info"
+
 # We also need to configure the cache backend, do you want to cache the values in memory or in redis. Currently only in memory and redis is supported. Here is a list of supported values for cache_backend:
 # redis
 # in_memory

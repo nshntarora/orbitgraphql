@@ -3,6 +3,7 @@ package logger
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"time"
 
@@ -15,17 +16,55 @@ type Logger struct {
 
 var logInstance *Logger
 
-func init() {
-	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
-	zerolog.SetGlobalLevel(zerolog.InfoLevel)
+func getLoggerWithParams(format, level string) *Logger {
+	var writer io.Writer
+
+	if format == "json" {
+		writer = os.Stdout
+	} else {
+		writer = zerolog.ConsoleWriter{Out: os.Stdout}
+	}
+
+	lvl, err := zerolog.ParseLevel(level)
+	if err != nil {
+		lvl = zerolog.InfoLevel
+	}
+
+	logger := zerolog.New(writer).With().Timestamp().Logger()
+	zerolog.SetGlobalLevel(lvl)
 	zerolog.TimeFieldFormat = time.RFC3339
-	logInstance = &Logger{
+	return &Logger{
 		logger: logger,
 	}
 }
 
+func init() {
+	logInstance = getLoggerWithParams("text", "info")
+}
+
+type Config struct {
+	Format string
+	Level  string
+}
+
+func Configure(cfg *Config) {
+
+	if cfg == nil {
+		cfg = &Config{
+			Format: "text",
+			Level:  "info",
+		}
+	}
+
+	logInstance = getLoggerWithParams(cfg.Format, cfg.Level)
+}
+
 func Error(ctx context.Context, message ...any) {
 	logInstance.logger.Error().Fields(GetMetadata(ctx)).Msg(getMessage(message...))
+}
+
+func Log(ctx context.Context) {
+	logInstance.logger.Log().Fields(GetMetadata(ctx)).Send()
 }
 
 func Info(ctx context.Context, message ...any) {
@@ -49,7 +88,15 @@ func Panic(ctx context.Context, message ...any) {
 }
 
 func getMessage(message ...any) string {
-	return fmt.Sprintf("%v", message...)
+	// convert the any array to a single string message
+	var msg string
+	for i, m := range message {
+		msg += fmt.Sprintf("%v", m)
+		if i < len(message)-1 {
+			msg += " "
+		}
+	}
+	return msg
 }
 
 type loggerCtx struct{}
