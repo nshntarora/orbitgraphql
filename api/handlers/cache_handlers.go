@@ -2,10 +2,12 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"graphql_cache/config"
 	"graphql_cache/graphcache"
+	"graphql_cache/logger"
 	"io"
 	"net/http"
 	"net/url"
@@ -18,30 +20,30 @@ const CACHE_STATUS_MISS = "MISS"
 
 func GetCacheHandler(cfg *config.Config) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := context.Background()
 		w.Header().Add("Content-Type", "application/json")
-
 		// Create a new HTTP request with the same method, URL, and body as the original request
 		targetURL, err := url.Parse(cfg.Origin)
 		if err != nil {
-			fmt.Println(err)
-			http.Error(w, "Error parsing target URL", http.StatusInternalServerError)
+			logger.Error(ctx, err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 
 		// only handle if the request is of content type application/json
 		// for all other content types, pass the request to the origin server
 		if r.Header.Get("Content-Type") != "application/json" {
-			proxyReq, err := CopyRequest(r, cfg.Origin)
+			proxyReq, err := CopyRequest(ctx, r, cfg.Origin)
 			if err != nil {
-				fmt.Println(err)
-				http.Error(w, "Error copying request", http.StatusInternalServerError)
+				logger.Error(ctx, err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
 			}
 
-			resp, err := SendRequest(proxyReq, w, map[string]interface{}{
+			resp, err := SendRequest(ctx, proxyReq, w, map[string]interface{}{
 				cfg.CacheHeaderName: CACHE_STATUS_BYPASS,
 			})
 			if err != nil {
-				fmt.Println(err)
-				http.Error(w, "error sending proxy request", http.StatusInternalServerError)
+				logger.Error(ctx, err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
 			}
 			defer resp.Body.Close()
 
@@ -51,39 +53,39 @@ func GetCacheHandler(cfg *config.Config) http.HandlerFunc {
 			return
 		}
 
-		proxyReq, err := CopyRequest(r, targetURL.String())
+		proxyReq, err := CopyRequest(ctx, r, targetURL.String())
 		if err != nil {
-			fmt.Println(err)
-			http.Error(w, "Error copying request", http.StatusInternalServerError)
+			logger.Error(ctx, err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 
 		requestBody, err := io.ReadAll(proxyReq.Body)
 		if err != nil {
-			fmt.Println(err)
-			http.Error(w, "error reading request body", http.StatusInternalServerError)
+			logger.Error(ctx, err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		proxyReq.Body = io.NopCloser(bytes.NewBuffer(requestBody))
 
 		request := graphcache.GraphQLRequest{}
 		request.FromBytes(requestBody)
 
-		cache := graphcache.NewGraphCacheWithOptions(GetCacheOptions(cfg, GetScopeValues(cfg, proxyReq)))
+		cache := graphcache.NewGraphCacheWithOptions(ctx, GetCacheOptions(cfg, GetScopeValues(cfg, proxyReq)))
 
 		start := time.Now()
 
 		astQuery, err := graphcache.GetASTFromQuery(request.Query)
 		if err != nil {
-			fmt.Println(err)
-			http.Error(w, "error parsing query", http.StatusInternalServerError)
+			logger.Error(ctx, err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 
 		transformedBody, err := graphcache.AddTypenameToQuery(request.Query)
 		if err != nil {
-			fmt.Println(err)
-			http.Error(w, "error transforming body", http.StatusInternalServerError)
+			logger.Error(ctx, err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 
-		fmt.Println("time taken to transform body ", time.Since(start))
+		logger.Debug(ctx, "time taken to transform body ", time.Since(start))
 
 		transformedRequest := request
 		transformedRequest.Query = transformedBody
@@ -94,12 +96,12 @@ func GetCacheHandler(cfg *config.Config) http.HandlerFunc {
 			proxyReq.Body = io.NopCloser(bytes.NewBuffer(transformedRequest.Bytes()))
 			proxyReq.ContentLength = -1
 
-			resp, err := SendRequest(proxyReq, w, map[string]interface{}{
+			resp, err := SendRequest(ctx, proxyReq, w, map[string]interface{}{
 				cfg.CacheHeaderName: CACHE_STATUS_BYPASS,
 			})
 			if err != nil {
-				fmt.Println(err)
-				http.Error(w, "error sending proxy request", http.StatusInternalServerError)
+				logger.Error(ctx, err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
 			}
 			defer resp.Body.Close()
 
@@ -109,7 +111,7 @@ func GetCacheHandler(cfg *config.Config) http.HandlerFunc {
 			responseMap := make(map[string]interface{})
 			err = json.Unmarshal(responseBody.Bytes(), &responseMap)
 			if err != nil {
-				fmt.Println("Error unmarshalling response:", string(responseBody.Bytes()))
+				logger.Error(ctx, err)
 			}
 
 			cache.InvalidateCache("data", responseMap, nil)
@@ -118,7 +120,7 @@ func GetCacheHandler(cfg *config.Config) http.HandlerFunc {
 			newResponse.FromBytes(responseBody.Bytes())
 			res, err := cache.RemoveTypenameFromResponse(newResponse)
 			if err != nil {
-				http.Error(w, "error removing __typename", http.StatusInternalServerError)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
 			}
 
 			w.Write(res.Bytes())
@@ -127,16 +129,16 @@ func GetCacheHandler(cfg *config.Config) http.HandlerFunc {
 
 		cachedResponse, err := cache.ParseASTBuildResponse(astQuery, request)
 		if err == nil && cachedResponse != nil {
-			fmt.Println("serving response from cache...")
+			logger.Info(ctx, "serving response from cache")
 			br, err := json.Marshal(cachedResponse)
 			if err != nil {
-				http.Error(w, "error marshalling response", http.StatusInternalServerError)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
 			}
-			fmt.Println("time taken to serve response from cache ", time.Since(start))
+			logger.Debug(ctx, "time taken to serve response from cache ", time.Since(start))
 			graphqlresponse := graphcache.GraphQLResponse{Data: json.RawMessage(br)}
 			res, err := cache.RemoveTypenameFromResponse(&graphqlresponse)
 			if err != nil {
-				http.Error(w, "error removing __typename", http.StatusInternalServerError)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
 			}
 			w.Header().Add(cfg.CacheHeaderName, CACHE_STATUS_HIT)
 			w.Write(res.Bytes())
@@ -146,12 +148,12 @@ func GetCacheHandler(cfg *config.Config) http.HandlerFunc {
 		proxyReq.Body = io.NopCloser(bytes.NewBuffer(transformedRequest.Bytes()))
 		proxyReq.ContentLength = -1
 
-		resp, err := SendRequest(proxyReq, w, map[string]interface{}{
+		resp, err := SendRequest(ctx, proxyReq, w, map[string]interface{}{
 			cfg.CacheHeaderName: CACHE_STATUS_MISS,
 		})
 		if err != nil {
-			fmt.Println(err)
-			http.Error(w, "error sending proxy request", http.StatusInternalServerError)
+			logger.Error(ctx, err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		defer resp.Body.Close()
 
@@ -161,18 +163,18 @@ func GetCacheHandler(cfg *config.Config) http.HandlerFunc {
 		responseMap := make(map[string]interface{})
 		err = json.Unmarshal(responseBody.Bytes(), &responseMap)
 		if err != nil {
-			fmt.Println("Error unmarshalling response:", string(responseBody.Bytes()))
+			logger.Error(ctx, err)
 		}
 
-		fmt.Println("time taken to get response from API ", time.Since(start))
+		logger.Debug(ctx, "time taken to get response from API ", time.Since(start))
 
 		astWithTypes, err := graphcache.GetASTFromQuery(transformedRequest.Query)
 		if err != nil {
-			fmt.Println(err)
-			http.Error(w, "error parsing query", http.StatusInternalServerError)
+			logger.Error(ctx, err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 
-		fmt.Println("time taken to generate AST with types ", time.Since(start))
+		logger.Debug(ctx, "time taken to generate AST with types ", time.Since(start))
 
 		reqVariables := transformedRequest.Variables
 		variables := make(map[string]interface{})
@@ -183,41 +185,33 @@ func GetCacheHandler(cfg *config.Config) http.HandlerFunc {
 		for _, op := range astWithTypes.Operations {
 			// for the operation op we need to traverse the response and build the relationship map where key is the requested field and value is the key where the actual response is stored in the cache
 			cache.CacheOperation(op, responseMap, variables)
-			// responseKey := cache.GetQueryResponseKey(op, responseMap, variables)
-			// for key, value := range responseKey {
-			// 	if value != nil {
-			// 		cache.SetQueryCache(key, value)
-			// 	}
-			// }
 		}
 
-		fmt.Println("time taken to build response key ", time.Since(start))
+		logger.Debug(ctx, "time taken to build response key ", time.Since(start))
 
 		// go through the response. Every object that has a __typename field, and an id field cache it in the format of typename:id
 		// for example, if the response has an object with __typename: "Organisation" and id: "1234", cache it as Organisation:1234
 		// if the object has a nested object with __typename: "User" and id: "5678", cache
 		// it as User:5678
-
 		cache.CacheResponse("data", responseMap, nil)
 
-		fmt.Println("time taken to cache response ", time.Since(start), responseMap)
+		logger.Debug(ctx, "time taken to cache response ", time.Since(start), responseMap)
 
 		newResponse := &graphcache.GraphQLResponse{}
 		newResponse.FromBytes(responseBody.Bytes())
 		res, err := cache.RemoveTypenameFromResponse(newResponse)
 		if err != nil {
-			http.Error(w, "error removing __typename", http.StatusInternalServerError)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 
 		w.Write(res.Bytes())
 	})
 }
 
-func CopyRequest(r *http.Request, targetURL string) (*http.Request, error) {
+func CopyRequest(ctx context.Context, r *http.Request, targetURL string) (*http.Request, error) {
 	proxyReq, err := http.NewRequest(r.Method, targetURL, r.Body)
 	if err != nil {
-		fmt.Println(err)
-		// http.Error(w, "Error creating proxy request", http.StatusInternalServerError)
+		logger.Error(ctx, err)
 		return nil, err
 	}
 
@@ -233,12 +227,12 @@ func CopyRequest(r *http.Request, targetURL string) (*http.Request, error) {
 	return proxyReq, nil
 }
 
-func SendRequest(proxyReq *http.Request, w http.ResponseWriter, headers map[string]interface{}) (*http.Response, error) {
+func SendRequest(ctx context.Context, proxyReq *http.Request, w http.ResponseWriter, headers map[string]interface{}) (*http.Response, error) {
 	client := http.Client{}
 	// Send the proxy request using the custom transport
 	resp, err := client.Do(proxyReq)
 	if err != nil || resp == nil {
-		http.Error(w, "Error sending proxy request", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return resp, err
 	}
 

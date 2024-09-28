@@ -14,6 +14,7 @@ type Config struct {
 	CacheBackend    string   `toml:"cache_backend"`
 	CacheHeaderName string   `toml:"cache_header_name"`
 	ScopeHeaders    []string `toml:"scope_headers"`
+	PrimaryKeyField string   `toml:"primary_key_field"`
 	Handlers        struct {
 		GraphQLPath     string `toml:"graphql_path"`
 		FlushAllPath    string `toml:"flush_all_path"`

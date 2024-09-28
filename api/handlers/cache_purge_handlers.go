@@ -1,8 +1,8 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
-	"fmt"
 	"graphql_cache/config"
 	"graphql_cache/graphcache"
 	"io"
@@ -16,7 +16,8 @@ type FlushCacheByTypeRequest struct {
 
 func GetFlushCacheHandler(cfg *config.Config) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		cache := graphcache.NewGraphCacheWithOptions(GetCacheOptions(cfg, GetScopeValues(cfg, r)))
+		ctx := context.Background()
+		cache := graphcache.NewGraphCacheWithOptions(ctx, GetCacheOptions(cfg, GetScopeValues(cfg, r)))
 		cache.Flush()
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("success"))
@@ -25,25 +26,20 @@ func GetFlushCacheHandler(cfg *config.Config) http.HandlerFunc {
 
 func GetFlushCacheByTypeHandler(cfg *config.Config) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		cache := graphcache.NewGraphCacheWithOptions(GetCacheOptions(cfg, GetScopeValues(cfg, r)))
+		ctx := context.Background()
+		cache := graphcache.NewGraphCacheWithOptions(ctx, GetCacheOptions(cfg, GetScopeValues(cfg, r)))
 		flushByTypeRequest := FlushCacheByTypeRequest{}
 		bytes, err := io.ReadAll(r.Body)
 		if err != nil {
 			http.Error(w, "error reading request", http.StatusBadRequest)
 			return
 		}
-		fmt.Println("flush by type body - ", string(bytes))
 		err = json.Unmarshal(bytes, &flushByTypeRequest)
 		if err != nil {
 			http.Error(w, "error decoding request", http.StatusBadRequest)
 			return
 		}
 
-		// err := json.NewDecoder(r.Body).Decode(&flushByTypeRequest)
-		// if err != nil {
-		// 	http.Error(w, "error decoding request", http.StatusBadRequest)
-		// 	return
-		// }
 		cache.FlushByType(flushByTypeRequest.Type, flushByTypeRequest.ID)
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("success"))

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"graphql_cache/config"
 	"graphql_cache/graphcache"
@@ -9,7 +10,8 @@ import (
 
 func GetDebugHandler(cfg *config.Config) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		cache := graphcache.NewGraphCacheWithOptions(GetCacheOptions(cfg, GetScopeValues(cfg, r)))
+		ctx := context.Background()
+		cache := graphcache.NewGraphCacheWithOptions(ctx, GetCacheOptions(cfg, GetScopeValues(cfg, r)))
 		resp := cache.Look()
 		br, err := json.Marshal(resp)
 		if err != nil {

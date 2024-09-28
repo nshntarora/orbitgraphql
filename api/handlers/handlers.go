@@ -52,6 +52,7 @@ func GetCacheOptions(cfg *config.Config, values []interface{}) *graphcache.Graph
 		QueryStore:  *QueryStore,
 		ObjectStore: *ObjectStore,
 		Prefix:      valueHash,
+		IDField:     cfg.PrimaryKeyField,
 	}
 }
 

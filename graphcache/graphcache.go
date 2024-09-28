@@ -1,11 +1,12 @@
 package graphcache
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"graphql_cache/cache"
+	"graphql_cache/logger"
 	"graphql_cache/utils"
 	"reflect"
 	"strings"
@@ -14,9 +15,12 @@ import (
 )
 
 const DEFAULT_CACHE_PREFIX = "orbit::"
+const TYPENAME_FIELD = "__typename"
 
 // GraphCache is a struct that holds the cache stores for the GraphQL cache
 type GraphCache struct {
+	ctx             context.Context
+	idField         string
 	prefix          string
 	cacheStore      cache.Cache
 	queryCacheStore cache.Cache
@@ -25,6 +29,7 @@ type GraphCacheOptions struct {
 	QueryStore  cache.Cache
 	ObjectStore cache.Cache
 	Prefix      string
+	IDField     string
 }
 
 type CacheBackend string
@@ -33,17 +38,22 @@ const CacheBackendRedis CacheBackend = "redis"
 const CacheBackendInMemory CacheBackend = "in_memory"
 
 func NewGraphCache() *GraphCache {
-	return NewGraphCacheWithOptions(&GraphCacheOptions{
+	return NewGraphCacheWithOptions(context.Background(), &GraphCacheOptions{
 		ObjectStore: cache.NewInMemoryCache(),
 		QueryStore:  cache.NewInMemoryCache(),
 	})
 }
 
-func NewGraphCacheWithOptions(opts *GraphCacheOptions) *GraphCache {
+func NewGraphCacheWithOptions(ctx context.Context, opts *GraphCacheOptions) *GraphCache {
+	if opts.IDField == "" {
+		opts.IDField = "id"
+	}
 	return &GraphCache{
+		ctx:             ctx,
 		prefix:          opts.Prefix,
 		cacheStore:      opts.ObjectStore,
 		queryCacheStore: opts.QueryStore,
+		idField:         opts.IDField,
 	}
 }
 
@@ -55,12 +65,12 @@ func (gc *GraphCache) RemoveTypenameFromResponse(response *GraphQLResponse) (*Gr
 	mapResponse := make(map[string]interface{})
 	responseBytes, err := json.Marshal(response)
 	if err != nil {
-		fmt.Println("Error marshalling response:", err)
+		logger.Error(gc.ctx, "Error marshalling response:", err)
 		return nil, err
 	}
 	err = json.Unmarshal(responseBytes, &mapResponse)
 	if err != nil {
-		fmt.Println("Error unmarshalling response: ", err, string(responseBytes))
+		logger.Error(gc.ctx, "Error unmarshalling response: ", err, string(responseBytes))
 		return nil, err
 	}
 
@@ -68,14 +78,14 @@ func (gc *GraphCache) RemoveTypenameFromResponse(response *GraphQLResponse) (*Gr
 
 	br, err := json.Marshal(res)
 	if err != nil {
-		fmt.Println("Error marshalling response:", err)
+		logger.Error(gc.ctx, "Error marshalling response:", err)
 		return nil, err
 	}
 
 	gres := GraphQLResponse{}
 	err = json.Unmarshal(br, &gres)
 	if err != nil {
-		fmt.Println("Error unmarshalling response:", err, string(br))
+		logger.Error(gc.ctx, "Error unmarshalling response:", err, string(br))
 		return nil, err
 	}
 
@@ -87,7 +97,7 @@ func (gc *GraphCache) deleteTypename(data interface{}) interface{} {
 	case map[string]interface{}:
 		// If the current item is a map, iterate through its keys.
 		for key, val := range concreteVal {
-			if key == "__typename" {
+			if key == TYPENAME_FIELD {
 				// Delete the __typename key.
 				delete(concreteVal, key)
 			} else {
@@ -143,7 +153,7 @@ func (gc *GraphCache) ParseASTBuildResponse(astQuery *ast.QueryDocument, request
 		case string:
 			res, err := gc.TraverseResponseFromKey(responseType)
 			if err != nil || res == nil {
-				fmt.Println("Error traversing response from key:", err)
+				logger.Error(gc.ctx, "Error traversing response from key:", err)
 				return nil, err
 			}
 			return res, nil
@@ -154,7 +164,7 @@ func (gc *GraphCache) ParseASTBuildResponse(astQuery *ast.QueryDocument, request
 					if strings.HasPrefix(val, DEFAULT_CACHE_PREFIX) {
 						nestedResponse, err := gc.TraverseResponseFromKey(val)
 						if err != nil || nestedResponse == nil {
-							fmt.Println("Error traversing nested response from key:", val, " ", err)
+							logger.Error(gc.ctx, "Error traversing nested response from key:", val, " ", err)
 							return nil, err
 						}
 						finalResponse[key] = nestedResponse
@@ -166,7 +176,7 @@ func (gc *GraphCache) ParseASTBuildResponse(astQuery *ast.QueryDocument, request
 							if strings.HasPrefix(v, DEFAULT_CACHE_PREFIX) {
 								nestedResponse, err := gc.TraverseResponseFromKey(v)
 								if err != nil || nestedResponse == nil {
-									fmt.Println("Error traversing nested response from key:", v, " ", err)
+									logger.Error(gc.ctx, "Error traversing nested response from key:", v, " ", err)
 									return nil, err
 								}
 								val[k] = nestedResponse
@@ -181,7 +191,7 @@ func (gc *GraphCache) ParseASTBuildResponse(astQuery *ast.QueryDocument, request
 							if strings.HasPrefix(v, DEFAULT_CACHE_PREFIX) {
 								nestedResponse, err := gc.TraverseResponseFromKey(v)
 								if err != nil || nestedResponse == nil {
-									fmt.Println("Error traversing nested response from key:", v, " ", err)
+									logger.Error(gc.ctx, "Error traversing nested response from key:", v, " ", err)
 									return nil, err
 								}
 								val[i] = nestedResponse
@@ -198,7 +208,7 @@ func (gc *GraphCache) ParseASTBuildResponse(astQuery *ast.QueryDocument, request
 								if strings.HasPrefix(v, DEFAULT_CACHE_PREFIX) {
 									nestedResponse, err := gc.TraverseResponseFromKey(v)
 									if err != nil || nestedResponse == nil {
-										fmt.Println("Error traversing nested response from key:", v, " ", err)
+										logger.Error(gc.ctx, "Error traversing nested response from key:", v, " ", err)
 										return nil, err
 									}
 									val[i][k] = nestedResponse
@@ -217,7 +227,7 @@ func (gc *GraphCache) ParseASTBuildResponse(astQuery *ast.QueryDocument, request
 					if strings.HasPrefix(val, DEFAULT_CACHE_PREFIX) {
 						nestedResponse, err := gc.TraverseResponseFromKey(val)
 						if err != nil || nestedResponse == nil {
-							fmt.Println("Error traversing nested response from key:", val, " ", err)
+							logger.Error(gc.ctx, "Error traversing nested response from key:", val, " ", err)
 							return nil, err
 						}
 						responseArray[i] = nestedResponse
@@ -228,7 +238,7 @@ func (gc *GraphCache) ParseASTBuildResponse(astQuery *ast.QueryDocument, request
 							if strings.HasPrefix(val, DEFAULT_CACHE_PREFIX) {
 								nestedResponse, err := gc.TraverseResponseFromKey(val)
 								if err != nil || nestedResponse == nil {
-									fmt.Println("Error traversing nested response from key:", val, " ", err)
+									logger.Error(gc.ctx, "Error traversing nested response from key:", val, " ", err)
 									return nil, err
 								}
 								obj[key] = nestedResponse
@@ -247,10 +257,9 @@ func (gc *GraphCache) ParseASTBuildResponse(astQuery *ast.QueryDocument, request
 func (gc *GraphCache) TraverseResponseFromKey(response interface{}) (interface{}, error) {
 	if val, ok := response.(string); ok {
 		if strings.HasPrefix(val, DEFAULT_CACHE_PREFIX) {
-			fmt.Println("value - ", val)
 			response, err := gc.cacheStore.Get(val)
 			if err != nil {
-				fmt.Println("Error getting response from cache:", err)
+				logger.Error(gc.ctx, "Error getting response from cache:", err)
 				return nil, err
 			}
 			return gc.TraverseResponseFromKey(response)
@@ -261,7 +270,7 @@ func (gc *GraphCache) TraverseResponseFromKey(response interface{}) (interface{}
 				if strings.HasPrefix(val, DEFAULT_CACHE_PREFIX) {
 					nestedResponse, err := gc.TraverseResponseFromKey(val)
 					if err != nil {
-						fmt.Println("Error traversing nested response from key:", val, " ", err)
+						logger.Error(gc.ctx, "Error traversing nested response from key:", val, " ", err)
 						return nil, err
 					}
 					responseMap[key] = nestedResponse
@@ -272,7 +281,7 @@ func (gc *GraphCache) TraverseResponseFromKey(response interface{}) (interface{}
 						if strings.HasPrefix(v, DEFAULT_CACHE_PREFIX) {
 							nestedResponse, err := gc.TraverseResponseFromKey(v)
 							if err != nil {
-								fmt.Println("Error traversing nested response from key:", v, " ", err)
+								logger.Error(gc.ctx, "Error traversing nested response from key:", v, " ", err)
 								return nil, err
 							}
 							val[k] = nestedResponse
@@ -285,7 +294,7 @@ func (gc *GraphCache) TraverseResponseFromKey(response interface{}) (interface{}
 						if strings.HasPrefix(v, DEFAULT_CACHE_PREFIX) {
 							nestedResponse, err := gc.TraverseResponseFromKey(v)
 							if err != nil {
-								fmt.Println("Error traversing nested response from key:", v, " ", err)
+								logger.Error(gc.ctx, "Error traversing nested response from key:", v, " ", err)
 								return nil, err
 							}
 							val[i] = nestedResponse
@@ -316,15 +325,15 @@ func (gc *GraphCache) CacheObject(field string, object map[string]interface{}, p
 		parentKeys = append(parentKeys, key)
 	}
 
-	if utils.StringArrayContainsString(objectKeys, "__typename") && utils.StringArrayContainsString(objectKeys, "id") {
-		typename := object["__typename"].(string)
-		id := object["id"].(string)
+	if utils.StringArrayContainsString(objectKeys, TYPENAME_FIELD) && utils.StringArrayContainsString(objectKeys, gc.idField) {
+		typename := object[TYPENAME_FIELD].(string)
+		id := object[gc.idField].(string)
 		cacheKey := typename + ":" + id
 		gc.cacheStore.Set(gc.Key(cacheKey), object)
 		return gc.Key(cacheKey)
-	} else if utils.StringArrayContainsString(objectKeys, "__typename") && !utils.StringArrayContainsString(objectKeys, "id") && parent != nil && utils.StringArrayContainsString(parentKeys, "id") && utils.StringArrayContainsString(parentKeys, "__typename") {
-		typename := parent["__typename"].(string)
-		parentID := parent["id"].(string)
+	} else if utils.StringArrayContainsString(objectKeys, TYPENAME_FIELD) && !utils.StringArrayContainsString(objectKeys, gc.idField) && parent != nil && utils.StringArrayContainsString(parentKeys, gc.idField) && utils.StringArrayContainsString(parentKeys, TYPENAME_FIELD) {
+		typename := parent[TYPENAME_FIELD].(string)
+		parentID := parent[gc.idField].(string)
 		cacheKey := typename + ":" + parentID + ":" + field
 		gc.cacheStore.Set(gc.Key(cacheKey), object)
 		return gc.Key(cacheKey)
@@ -417,7 +426,7 @@ func (gc *GraphCache) GetResponseTypeID(selectionSet ast.SelectionSet, response 
 	// remove __typename field from the selection set
 	for _, selection := range selectionSet {
 		if field, ok := selection.(*ast.Field); ok {
-			if field.Name != "__typename" {
+			if field.Name != TYPENAME_FIELD {
 				updatedSelectionSet = append(updatedSelectionSet, field)
 			}
 		}
@@ -440,9 +449,9 @@ func (gc *GraphCache) GetResponseTypeID(selectionSet ast.SelectionSet, response 
 		switch reflect.TypeOf(response[selection.Name]).Kind() {
 		case reflect.Map:
 			selectionRespone, ok := response[selection.Name].(map[string]interface{})
-			if ok && selectionRespone != nil && selectionRespone["id"] != nil && selectionRespone["__typename"] != nil {
-				id := selectionRespone["id"].(string)
-				typeName := selectionRespone["__typename"].(string)
+			if ok && selectionRespone != nil && selectionRespone[gc.idField] != nil && selectionRespone[TYPENAME_FIELD] != nil {
+				id := selectionRespone[gc.idField].(string)
+				typeName := selectionRespone[TYPENAME_FIELD].(string)
 				return map[string]interface{}{updatedSelectionSet[0].(*ast.Field).Name: gc.Key(typeName + ":" + id)}
 			}
 		case reflect.Slice:
@@ -451,9 +460,9 @@ func (gc *GraphCache) GetResponseTypeID(selectionSet ast.SelectionSet, response 
 				responseObjects := make([]interface{}, 0)
 				for _, obj := range selectionRespone {
 					if objMap, ok := obj.(map[string]interface{}); ok {
-						if objMap["id"] != nil && objMap["__typename"] != nil {
-							id := objMap["id"].(string)
-							typeName := objMap["__typename"].(string)
+						if objMap[gc.idField] != nil && objMap[TYPENAME_FIELD] != nil {
+							id := objMap[gc.idField].(string)
+							typeName := objMap[TYPENAME_FIELD].(string)
 							responseObjects = append(responseObjects, gc.Key(typeName+":"+id))
 						}
 					}
@@ -552,15 +561,15 @@ func (gc *GraphCache) InvalidateCacheObject(field string, object map[string]inte
 		parentKeys = append(parentKeys, key)
 	}
 
-	if utils.StringArrayContainsString(objectKeys, "__typename") && utils.StringArrayContainsString(objectKeys, "id") {
-		typename := object["__typename"].(string)
-		id := object["id"].(string)
+	if utils.StringArrayContainsString(objectKeys, TYPENAME_FIELD) && utils.StringArrayContainsString(objectKeys, gc.idField) {
+		typename := object[TYPENAME_FIELD].(string)
+		id := object[gc.idField].(string)
 		cacheKey := typename + ":" + id
 		gc.cacheStore.DeleteByPrefix(gc.Key(cacheKey))
 		return gc.Key(cacheKey)
-	} else if utils.StringArrayContainsString(objectKeys, "__typename") && !utils.StringArrayContainsString(objectKeys, "id") && parent != nil && utils.StringArrayContainsString(parentKeys, "id") && utils.StringArrayContainsString(parentKeys, "__typename") {
-		typename := parent["__typename"].(string)
-		parentID := parent["id"].(string)
+	} else if utils.StringArrayContainsString(objectKeys, TYPENAME_FIELD) && !utils.StringArrayContainsString(objectKeys, gc.idField) && parent != nil && utils.StringArrayContainsString(parentKeys, gc.idField) && utils.StringArrayContainsString(parentKeys, TYPENAME_FIELD) {
+		typename := parent[TYPENAME_FIELD].(string)
+		parentID := parent[gc.idField].(string)
 		cacheKey := typename + ":" + parentID + ":" + field
 		gc.cacheStore.DeleteByPrefix(gc.Key(cacheKey))
 		return gc.Key(cacheKey)
