@@ -1,4 +1,6 @@
-# GraphQL Cache
+![](./logo.svg)
+
+# Orbit GraphQL
 
 ### Stellate and urql like cache for your GraphQL APIs
 
