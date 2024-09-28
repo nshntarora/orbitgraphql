@@ -8,27 +8,31 @@ import (
 	"github.com/pelletier/go-toml/v2"
 )
 
-type Config struct {
-	Origin          string   `toml:"origin"`
-	Port            int      `toml:"port"`
-	CacheBackend    string   `toml:"cache_backend"`
-	CacheHeaderName string   `toml:"cache_header_name"`
-	ScopeHeaders    []string `toml:"scope_headers"`
-	PrimaryKeyField string   `toml:"primary_key_field"`
-	Handlers        struct {
-		GraphQLPath     string `toml:"graphql_path"`
-		FlushAllPath    string `toml:"flush_all_path"`
-		FlushByTypePath string `toml:"flush_by_type_path"`
-		DebugPath       string `toml:"debug_path"`
-		HealthPath      string `toml:"health_path"`
-	} `toml:"handlers"`
-	Redis struct {
-		Host string `toml:"host"`
-		Port int    `toml:"port"`
-	} `toml:"redis"`
+type HandlersConfig struct {
+	GraphQLPath     string `toml:"graphql_path"`
+	FlushAllPath    string `toml:"flush_all_path"`
+	FlushByTypePath string `toml:"flush_by_type_path"`
+	DebugPath       string `toml:"debug_path"`
+	HealthPath      string `toml:"health_path"`
 }
 
-const CONFIG_FILE = "./config.toml"
+type RedisConfig struct {
+	Host string `toml:"host"`
+	Port int    `toml:"port"`
+}
+
+type Config struct {
+	Origin          string         `toml:"origin"`
+	Port            int            `toml:"port"`
+	CacheBackend    string         `toml:"cache_backend"`
+	CacheHeaderName string         `toml:"cache_header_name"`
+	ScopeHeaders    []string       `toml:"scope_headers"`
+	PrimaryKeyField string         `toml:"primary_key_field"`
+	Handlers        HandlersConfig `toml:"handlers"`
+	Redis           RedisConfig    `toml:"redis"`
+}
+
+var CONFIG_FILE = "./config.toml"
 
 func NewConfig() *Config {
 

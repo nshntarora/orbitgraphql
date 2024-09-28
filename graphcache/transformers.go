@@ -23,7 +23,7 @@ func AddTypenameToQuery(query string) (string, error) {
 	for _, operation := range astQuery.Operations {
 		modifiedQuery += string(operation.Operation) + " "
 		if operation.Name != "" {
-			modifiedQuery += operation.Name + " "
+			modifiedQuery += operation.Name
 		}
 		if len(operation.VariableDefinitions) > 0 {
 			modifiedQuery += "("
@@ -38,6 +38,7 @@ func AddTypenameToQuery(query string) (string, error) {
 			}
 			modifiedQuery += ") "
 		}
+		// modifiedQuery += " "
 
 		modifiedQuery += convertSelectionSetToString(operation.SelectionSet)
 	}
@@ -46,34 +47,45 @@ func AddTypenameToQuery(query string) (string, error) {
 }
 
 func convertSelectionSetToString(selectionSet ast.SelectionSet) string {
-	var builder strings.Builder
+	var builder []string
 	for _, selection := range selectionSet {
 		switch selection := selection.(type) {
 		case *ast.Field:
-			builder.WriteString(selection.Name)
-			builder.WriteString(" ")
+			field := []string{}
+			field = append(field, selection.Name)
 			if len(selection.Arguments) > 0 {
-				builder.WriteString("(")
+				args := []string{}
+				args = append(args, "(")
 				for i, arg := range selection.Arguments {
 					if i > 0 {
-						builder.WriteString(", ")
+						args = append(args, ", ")
 					}
-					builder.WriteString(arg.Name)
-					builder.WriteString(": ")
-					builder.WriteString(arg.Value.String())
+					args = append(args, arg.Name)
+					args = append(args, ": ")
+					args = append(args, arg.Value.String())
 				}
-				builder.WriteString(")")
+				args = append(args, ")")
+				field = append(field, strings.Join(args, ""))
 			}
-			builder.WriteString(convertSelectionSetToString(selection.SelectionSet))
+			builder = append(builder, strings.Join(field, ""))
+			if len(selection.SelectionSet) > 0 {
+				builder = append(builder, convertSelectionSetToString(selection.SelectionSet))
+			}
 		case *ast.InlineFragment:
-			builder.WriteString("...")
-			builder.WriteString(convertSelectionSetToString(selection.SelectionSet))
+			builder = append(builder, "...")
+			if len(selection.SelectionSet) > 0 {
+				builder = append(builder, convertSelectionSetToString(selection.SelectionSet))
+			}
 		case *ast.FragmentSpread:
 			// Handle fragment spreads if necessary
 		}
 	}
-	if builder.String() != "" {
-		return "{" + builder.String() + "}"
+	if len(builder) > 0 {
+		block := []string{}
+		block = append(block, "{")
+		block = append(block, builder...)
+		block = append(block, "}")
+		return strings.Join(block, " ")
 	}
 	return ""
 }

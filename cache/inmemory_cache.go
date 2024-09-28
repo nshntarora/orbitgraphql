@@ -72,11 +72,7 @@ func (c *InMemoryCache) Flush() error {
 }
 
 func (c *InMemoryCache) DeleteByPrefix(prefix string) error {
-	fmt.Println("deleting by prefix ", prefix)
 	var re = regexp.MustCompile(`(?m)` + strings.ReplaceAll(c.Key(prefix), "*", ".*"))
-
-	fmt.Println("regex: ", re)
-
 	for k := range c.data {
 		// regex match the prefix to the key
 		// if the key is gql:* then delete all keys which start with gql

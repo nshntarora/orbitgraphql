@@ -469,6 +469,11 @@ func (gc *GraphCache) GetResponseTypeID(selectionSet ast.SelectionSet, response 
 				}
 				return map[string]interface{}{updatedSelectionSet[0].(*ast.Field).Name: responseObjects}
 			}
+		case reflect.String:
+			selectionResponse, ok := response[selection.Name].(string)
+			if ok {
+				return map[string]interface{}{updatedSelectionSet[0].(*ast.Field).Name: gc.Key(response[TYPENAME_FIELD].(string) + ":" + selectionResponse)}
+			}
 		}
 	}
 	return nil
