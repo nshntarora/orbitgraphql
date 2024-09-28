@@ -16,6 +16,9 @@ port=9090
 # The returns cache hit or cache miss in the header you specify here. Default is X-Orbit-Cache
 cache_header_name="X-Orbit-Cache"
 
+# TTL of the graphql cache in seconds - default is 60 minutes
+cache_ttl=3600
+
 # If you have an authenticated API and want to separate the cache based on what the headers are, you can configure the headers here.
 # The system will scope the cache based on the unique values of the headers you provide
 # For example, if you want to scope the cache based on the Authorization header, you can set the following:

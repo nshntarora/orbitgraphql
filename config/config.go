@@ -26,6 +26,7 @@ type Config struct {
 	Port            int            `toml:"port"`
 	CacheBackend    string         `toml:"cache_backend"`
 	CacheHeaderName string         `toml:"cache_header_name"`
+	CacheTTL        int            `toml:"cache_ttl"`
 	ScopeHeaders    []string       `toml:"scope_headers"`
 	PrimaryKeyField string         `toml:"primary_key_field"`
 	Handlers        HandlersConfig `toml:"handlers"`
@@ -83,6 +84,11 @@ func NewConfig() *Config {
 
 	if cfg.CacheHeaderName == "" {
 		cfg.CacheHeaderName = "x-orbit-cache"
+	}
+
+	if cfg.CacheTTL == 0 {
+		// default cache TTL is 1 hour
+		cfg.CacheTTL = 3600
 	}
 
 	return &cfg

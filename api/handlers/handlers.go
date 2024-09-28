@@ -27,9 +27,9 @@ func GetHandlers(cfg *config.Config) *http.ServeMux {
 
 func GetNewCacheStore(cfg *config.Config) cache.Cache {
 	if cfg.CacheBackend == "redis" {
-		cache.NewRedisCache(cfg.Redis.Host, strconv.Itoa(cfg.Redis.Port))
+		cache.NewRedisCache(cfg.Redis.Host, strconv.Itoa(cfg.Redis.Port), cfg.CacheTTL)
 	}
-	return cache.NewInMemoryCache()
+	return cache.NewInMemoryCache(cfg.CacheTTL)
 }
 
 func GetCacheOptions(cfg *config.Config, values []interface{}) *graphcache.GraphCacheOptions {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"reflect"
+	"time"
 
 	"github.com/go-redis/redis/v8"
 )
@@ -13,13 +14,14 @@ var ctx = context.Background()
 // RedisCache implements the Cache interface and uses Redis as the cache store
 type RedisCache struct {
 	cache *redis.Client
+	ttl   int
 }
 
 func (c *RedisCache) Key(key string) string {
 	return key
 }
 
-func NewRedisCache(host, port string) Cache {
+func NewRedisCache(host, port string, ttl int) Cache {
 	c := redis.NewClient(&redis.Options{
 		Addr:     host + ":" + port,
 		Password: "", // no password set
@@ -27,6 +29,7 @@ func NewRedisCache(host, port string) Cache {
 	})
 	return &RedisCache{
 		cache: c,
+		ttl:   ttl,
 	}
 }
 
@@ -35,14 +38,14 @@ func (c *RedisCache) Set(key string, value interface{}) error {
 	switch valueType.Kind() {
 	case reflect.Map:
 		br, _ := json.Marshal(value)
-		c.cache.Set(ctx, c.Key(key), string(br), 0)
-		c.cache.Set(ctx, c.Key(key+"_type"), "reflect.Map", 0)
+		c.cache.Set(ctx, c.Key(key), string(br), time.Second*time.Duration(c.ttl))
+		c.cache.Set(ctx, c.Key(key+"_type"), "reflect.Map", time.Second*time.Duration(c.ttl))
 	case reflect.Slice:
 		br, _ := json.Marshal(value)
-		c.cache.Set(ctx, c.Key(key), string(br), 0)
-		c.cache.Set(ctx, c.Key(key+"_type"), "reflect.Slice", 0)
+		c.cache.Set(ctx, c.Key(key), string(br), time.Second*time.Duration(c.ttl))
+		c.cache.Set(ctx, c.Key(key+"_type"), "reflect.Slice", time.Second*time.Duration(c.ttl))
 	default:
-		c.cache.Set(ctx, c.Key(key), value, 0)
+		c.cache.Set(ctx, c.Key(key), value, time.Second*time.Duration(c.ttl))
 	}
 	return nil
 }

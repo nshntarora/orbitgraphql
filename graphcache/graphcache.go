@@ -39,8 +39,8 @@ const CacheBackendInMemory CacheBackend = "in_memory"
 
 func NewGraphCache() *GraphCache {
 	return NewGraphCacheWithOptions(context.Background(), &GraphCacheOptions{
-		ObjectStore: cache.NewInMemoryCache(),
-		QueryStore:  cache.NewInMemoryCache(),
+		ObjectStore: cache.NewInMemoryCache(300),
+		QueryStore:  cache.NewInMemoryCache(300),
 	})
 }
 

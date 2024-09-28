@@ -19,8 +19,8 @@ func TestNewGraphCache(t *testing.T) {
 
 func TestNewGraphCacheWithOptions(t *testing.T) {
 	opts := &GraphCacheOptions{
-		ObjectStore: cache.NewInMemoryCache(),
-		QueryStore:  cache.NewInMemoryCache(),
+		ObjectStore: cache.NewInMemoryCache(300),
+		QueryStore:  cache.NewInMemoryCache(300),
 		Prefix:      "test::",
 		IDField:     "customID",
 	}
