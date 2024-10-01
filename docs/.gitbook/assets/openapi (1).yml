@@ -1,0 +1,98 @@
+openapi: 3.1.0
+info:
+  title: Orbit GraphQL API Documentation
+  version: 1.0.0
+paths:
+  /graphql:
+    post:
+      summary: The path to which you will send your GraphQL requests - this is where the caching happens.
+      description: |
+        Configuration:
+        TOML: handlers_graphql_path
+        ENV: ORBIT_HANDLERS_GRAPHQL_PATH
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                operationName:
+                  type: string
+                query:
+                  type: string
+                variables:
+                  type: object
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                  errors:
+                    type: object
+  /flush:
+    post:
+      summary: The path to flush all cached data.
+      description: |
+        Configuration:
+        TOML: handlers_flush_all_path
+        ENV: ORBIT_HANDLERS_FLUSH_ALL_PATH
+      responses:
+        '200':
+          description: Status indicating success or failure of the flush operation.
+  /flush.type:
+    post:
+      summary: The path to flush cached data by GraphQL type.
+      description: |
+        Configuration:
+        TOML: handlers_flush_by_type_path
+        ENV: ORBIT_HANDLERS_FLUSH_BY_TYPE_PATH
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                type:
+                  type: string
+                id:
+                  type: string
+      responses:
+        '200':
+          description: Status indicating success or failure of the flush operation.
+  /debug:
+    get:
+      summary: The path to access debug information. This only works for in_memory cache backend, where it returns the entire cache as a JSON object.
+      description: |
+        Configuration:
+        TOML: handlers_debug_path
+        ENV: ORBIT_HANDLERS_DEBUG_PATH
+      responses:
+        '200':
+          description: Debug information in JSON format.
+          content:
+            application/json:
+              cacheStore:
+                type: object
+              queryStore:
+                type: object
+  /health:
+    get:
+      summary: The path to check the health status of the service.
+      description: |
+        Configuration:
+        TOML: handlers_health_path
+        ENV: ORBIT_HANDLERS_HEALTH_PATH
+      responses:
+        '200':
+          description: Health status in JSON format.
+          content:
+            application/json:
+              schema:
+                type: object
