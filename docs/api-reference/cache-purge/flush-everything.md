@@ -1,5 +1,5 @@
 # Flush Everything
 
-{% swagger src="../../.gitbook/assets/openapi (2).yml" path="/flush" method="post" %}
-[openapi (2).yml](<../../.gitbook/assets/openapi (2).yml>)
+{% swagger src="../../.gitbook/assets/openapi.yml" path="/flush" method="post" %}
+[openapi.yml](../../.gitbook/assets/openapi.yml)
 {% endswagger %}

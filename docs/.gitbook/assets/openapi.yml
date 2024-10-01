@@ -7,9 +7,7 @@ paths:
     post:
       summary: The path to which you will send your GraphQL requests - this is where the caching happens.
       description: |
-        Configuration:
-        - _TOML_: `handlers_graphql_path`
-        - _ENV_: `ORBIT_HANDLERS_GRAPHQL_PATH`
+        Congiruable using handlers_graphql_path (in config.toml) or ORBIT_HANDLERS_GRAPHQL_PATH (using environment variables)
       requestBody:
         required: true
         content:
@@ -35,23 +33,19 @@ paths:
                     type: object
                   errors:
                     type: object
-  /flush-all:
+  /flush:
     post:
       summary: The path to flush all cached data.
       description: |
-        Configuration:
-        - _TOML_: `handlers_flush_all_path`
-        - _ENV_: `ORBIT_HANDLERS_FLUSH_ALL_PATH`
+        Congiruable using handlers_flush_all_path (in config.toml) or ORBIT_HANDLERS_FLUSH_ALL_PATH (using environment variables)
       responses:
         '200':
           description: Status indicating success or failure of the flush operation.
-  /flush-by-type:
+  /flush.type:
     post:
       summary: The path to flush cached data by GraphQL type.
       description: |
-        Configuration:
-        - _TOML_: `handlers_flush_by_type_path`
-        - _ENV_: `ORBIT_HANDLERS_FLUSH_BY_TYPE_PATH`
+        Configurable using handlers_flush_by_type_path (in config.toml) or ORBIT_HANDLERS_FLUSH_BY_TYPE_PATH (using environment variables)
       requestBody:
         required: true
         content:
@@ -68,11 +62,9 @@ paths:
           description: Status indicating success or failure of the flush operation.
   /debug:
     get:
-      summary: The path to access debug information. This only works for `in_memory` cache backend, where it returns the entire cache as a JSON object.
+      summary: The path to access debug information. This only works for in_memory cache backend, where it returns the entire cache as a JSON object.
       description: |
-        Configuration:
-        - _TOML_: `handlers_debug_path`
-        - _ENV_: `ORBIT_HANDLERS_DEBUG_PATH`
+        Congiruable using handlers_debug_path (in config.toml) or ORBIT_HANDLERS_DEBUG_PATH (using environment variables)
       responses:
         '200':
           description: Debug information in JSON format.
@@ -86,9 +78,7 @@ paths:
     get:
       summary: The path to check the health status of the service.
       description: |
-        Configuration:
-        - _TOML_: `handlers_health_path`
-        - _ENV_: `ORBIT_HANDLERS_HEALTH_PATH`
+        Congiruable using handlers_health_path (in config.toml) or ORBIT_HANDLERS_HEALTH_PATH (using environment variables)
       responses:
         '200':
           description: Health status in JSON format.

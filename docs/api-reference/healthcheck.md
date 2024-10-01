@@ -1,5 +1,5 @@
 # Healthcheck
 
-{% swagger src="../.gitbook/assets/openapi (2).yml" path="/health" method="get" %}
-[openapi (2).yml](<../.gitbook/assets/openapi (2).yml>)
+{% swagger src="../.gitbook/assets/openapi.yml" path="/health" method="get" %}
+[openapi.yml](../.gitbook/assets/openapi.yml)
 {% endswagger %}
